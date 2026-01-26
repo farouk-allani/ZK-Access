@@ -1,0 +1,6 @@
+{
+  "program": "identity.aleo",
+  "version": "0.1.0",
+  "description": "ZK-Access: Privacy-preserving identity vault for Aleo",
+  "license": "MIT"
+}
