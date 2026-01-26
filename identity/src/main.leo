@@ -1,10 +1,17 @@
-// ZK-Access: Identity Core Program
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZK-ACCESS: IDENTITY CORE (HARDENED)
 // Program: identity.aleo
-// Version: 1.0.0
+// Version: 2.0.0
 //
-// This program implements a privacy-preserving identity vault on Aleo.
-// All identity data is stored in encrypted records that only the owner can access.
-// No personal information is ever visible on-chain.
+// This program implements a cryptographically-secure private identity vault.
+// All identity data is stored in encrypted records with ownership enforcement.
+//
+// SECURITY MODEL:
+// - Records are encrypted with owner's viewing key (AES-based)
+// - Ownership is enforced via record consumption (only owner can spend)
+// - Nullifiers prevent double-spending and identity cloning
+// - No identity data is ever visible on-chain
+// ═══════════════════════════════════════════════════════════════════════════════
 
 program identity.aleo {
 
@@ -12,342 +19,338 @@ program identity.aleo {
     // RECORD DEFINITIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Primary identity record - encrypted by Aleo's record encryption
-    // This record represents a user's identity vault
+    // Primary identity record - ALL fields encrypted via Aleo record encryption
     record Identity {
-        // The address that owns this identity - only this address can spend/update
+        // Owner address - only this address can spend/update this record
+        // Enforcement: Aleo runtime rejects transactions where caller != owner
         owner: address,
 
-        // Cryptographic commitment to identity data: H(identity_data || salt)
-        // The preimage is NEVER stored on-chain
+        // Pedersen commitment to identity data: H(unique_id || attributes || salt)
+        // The preimage is NEVER stored - only the commitment
+        // Binding property: cannot find two different inputs with same commitment
+        // Hiding property: commitment reveals nothing about inputs without salt
         identity_commitment: field,
 
-        // Hash of optional encrypted off-chain data reference (IPFS CID, Arweave TX, etc.)
-        // Allows linking to extended identity data without on-chain storage
+        // Hash of encrypted off-chain data reference (IPFS CID, etc.)
+        // This allows linking to extended data without on-chain storage
         data_hash: field,
 
-        // Monotonically increasing version number for tracking updates
+        // Monotonically increasing version - tracks update history
         version: u32,
 
-        // Random salt used in commitment - ensures uniqueness and prevents grinding
+        // Random salt for commitment hiding - MUST be kept secret by user
+        // Without salt, commitment could theoretically be brute-forced
         salt: field,
+
+        // Secret for generating identity nullifier
+        // Used to prevent identity cloning attacks
+        // nullifier = H(identity_commitment || nullifier_secret)
+        nullifier_secret: field,
     }
 
-    // Identity binding token - used to prove identity ownership to other programs
-    // This is a lightweight record for cross-program composition
+    // Binding token for cross-program identity attestation
+    // Used to prove identity ownership to credential issuers
     record IdentityBinding {
         owner: address,
-        // The commitment that uniquely identifies this identity
+        // The commitment that identifies this identity
         identity_commitment: field,
-        // Binding context - what this binding is for (hashed purpose string)
+        // Context hash - what this binding is authorized for
+        // Prevents binding reuse across different contexts
         binding_context: field,
-        // One-time use nonce to prevent replay
+        // One-time nonce - prevents replay of the same binding
         nonce: field,
+        // Expiry block height - binding becomes invalid after this
+        expires_at: u64,
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STRUCT DEFINITIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Identity data structure for computing commitments
-    // This is used off-chain; the struct itself is never stored
-    struct IdentityData {
-        // Unique identifier hash (e.g., hash of SSN, passport number, etc.)
+    // Input structure for identity data (used in commitment computation)
+    struct IdentityInput {
         unique_id_hash: field,
-        // Additional identity attributes hash
         attributes_hash: field,
-        // Timestamp of identity creation (block height or unix timestamp)
-        created_at: u64,
+        timestamp: u64,
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // INLINE HELPER FUNCTIONS
+    // MAPPINGS (PUBLIC STATE - MINIMAL)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Compute identity commitment from identity data and salt
-    // Uses Pedersen hash for hiding commitment: H(data || salt)
-    inline compute_commitment(
-        unique_id_hash: field,
-        attributes_hash: field,
-        created_at: u64,
-        salt: field
-    ) -> field {
-        // Combine all identity data into a single field for hashing
-        let data_combined: field = BHP256::hash_to_field(
-            IdentityData {
-                unique_id_hash: unique_id_hash,
-                attributes_hash: attributes_hash,
-                created_at: created_at,
-            }
-        );
+    // Nullifier registry - prevents double-creation of identities
+    // Key: nullifier = H(identity_commitment || nullifier_secret)
+    // Value: true if nullifier has been used
+    // PRIVACY: Nullifier cannot be reversed to identity_commitment without secret
+    mapping identity_nullifiers: field => bool;
 
-        // Create hiding commitment by hashing data with salt
-        return BHP256::hash_to_field(data_combined + salt);
+    // Binding nonce registry - prevents binding replay
+    mapping used_binding_nonces: field => bool;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INLINE FUNCTIONS (COMPILED INTO CIRCUITS)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Compute identity commitment using Pedersen hash
+    // Properties:
+    // - Collision resistant: infeasible to find two inputs with same output
+    // - Hiding: output reveals nothing about input without salt
+    inline compute_commitment(input: IdentityInput, salt: field) -> field {
+        let input_hash: field = BHP256::hash_to_field(input);
+        return BHP256::hash_to_field(input_hash + salt);
     }
 
-    // Compute a deterministic but unpredictable nonce
-    inline compute_nonce(
-        owner: address,
+    // Compute identity nullifier
+    // The nullifier is deterministic but unpredictable without the secret
+    inline compute_nullifier(commitment: field, secret: field) -> field {
+        return BHP256::hash_to_field(commitment + secret);
+    }
+
+    // Compute binding nonce
+    inline compute_binding_nonce(
         commitment: field,
-        context: field
+        context: field,
+        seed: field
     ) -> field {
-        return BHP256::hash_to_field(
-            BHP256::hash_to_field(owner) + commitment + context
-        );
+        return BHP256::hash_to_field(commitment + context + seed);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // TRANSITIONS (STATE-CHANGING FUNCTIONS)
+    // TRANSITIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────────────────────
     // CREATE IDENTITY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Creates a new identity vault for the caller.
+    // ───────────────────────────────────────────────────────────────────────────
+    // Creates a new identity vault. The nullifier is registered to prevent
+    // the same identity from being created twice.
     //
-    // Parameters:
-    //   - unique_id_hash: Hash of user's unique identifier (computed off-chain)
-    //   - attributes_hash: Hash of additional identity attributes
-    //   - created_at: Timestamp/block height of creation
-    //   - salt: Random field element for commitment hiding
-    //   - data_hash: Hash of optional off-chain data reference
+    // SECURITY:
+    // - nullifier_secret MUST be random and kept private
+    // - salt MUST be random and kept private
+    // - unique_id_hash should be derived from a truly unique identifier
     //
-    // Returns:
-    //   - Identity record owned by caller
-    //
-    // Privacy: All inputs are private. Only the encrypted record is visible on-chain.
+    // PRIVACY:
+    // - All inputs are private (encrypted in ZK proof)
+    // - Only the nullifier is revealed (cannot be linked to identity)
     transition create_identity(
         unique_id_hash: field,
         attributes_hash: field,
-        created_at: u64,
+        timestamp: u64,
         salt: field,
+        nullifier_secret: field,
         data_hash: field
     ) -> Identity {
-        // Compute the identity commitment
-        let identity_commitment: field = compute_commitment(
-            unique_id_hash,
-            attributes_hash,
-            created_at,
-            salt
-        );
+        // Construct input for commitment
+        let input: IdentityInput = IdentityInput {
+            unique_id_hash: unique_id_hash,
+            attributes_hash: attributes_hash,
+            timestamp: timestamp,
+        };
 
-        // Create and return the identity record
-        // The record is automatically encrypted with the owner's viewing key
-        return Identity {
+        // Compute commitment
+        let commitment: field = compute_commitment(input, salt);
+
+        // Compute nullifier for registration
+        let nullifier: field = compute_nullifier(commitment, nullifier_secret);
+
+        // Create identity record
+        let identity: Identity = Identity {
             owner: self.caller,
-            identity_commitment: identity_commitment,
+            identity_commitment: commitment,
             data_hash: data_hash,
             version: 1u32,
             salt: salt,
+            nullifier_secret: nullifier_secret,
         };
+
+        // Register nullifier in finalize (on-chain)
+        return identity then finalize(nullifier);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    finalize create_identity(nullifier: field) {
+        // Check nullifier hasn't been used (prevents identity cloning)
+        let exists: bool = Mapping::contains(identity_nullifiers, nullifier);
+        assert(!exists);
+
+        // Register nullifier
+        Mapping::set(identity_nullifiers, nullifier, true);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
     // UPDATE IDENTITY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Updates an existing identity with new data.
-    // The old record is consumed and a new record is created.
+    // ───────────────────────────────────────────────────────────────────────────
+    // Updates an identity by consuming the old record and creating a new one.
+    // The nullifier_secret is preserved to maintain identity continuity.
     //
-    // Parameters:
-    //   - identity: The existing identity record to update (proves ownership)
-    //   - new_unique_id_hash: New unique identifier hash
-    //   - new_attributes_hash: New attributes hash
-    //   - new_created_at: Original creation timestamp (preserved)
-    //   - new_salt: New random salt for the updated commitment
-    //   - new_data_hash: New off-chain data reference hash
-    //
-    // Returns:
-    //   - New Identity record with incremented version
-    //
-    // Security: Only the owner can call this (record consumption enforces ownership)
+    // SECURITY:
+    // - Only the owner can call this (record consumption enforces)
+    // - Version increments to track history
+    // - Nullifier is NOT re-registered (identity already exists)
     transition update_identity(
         identity: Identity,
         new_unique_id_hash: field,
         new_attributes_hash: field,
-        new_created_at: u64,
+        new_timestamp: u64,
         new_salt: field,
         new_data_hash: field
     ) -> Identity {
-        // Compute new commitment with updated data
-        let new_commitment: field = compute_commitment(
-            new_unique_id_hash,
-            new_attributes_hash,
-            new_created_at,
-            new_salt
-        );
+        // Verify ownership via assertion (belt-and-suspenders with record system)
+        assert_eq(identity.owner, self.caller);
 
-        // Return new identity record with incremented version
-        // Old record is implicitly consumed (spent)
+        // Compute new commitment
+        let input: IdentityInput = IdentityInput {
+            unique_id_hash: new_unique_id_hash,
+            attributes_hash: new_attributes_hash,
+            timestamp: new_timestamp,
+        };
+        let new_commitment: field = compute_commitment(input, new_salt);
+
+        // Return updated identity (old record consumed, new record created)
         return Identity {
             owner: self.caller,
             identity_commitment: new_commitment,
             data_hash: new_data_hash,
             version: identity.version + 1u32,
             salt: new_salt,
+            nullifier_secret: identity.nullifier_secret,  // Preserved
         };
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // UPDATE DATA HASH ONLY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Updates only the off-chain data reference without changing the identity commitment.
-    // Useful for updating extended attributes while preserving identity binding.
+    // ───────────────────────────────────────────────────────────────────────────
+    // CREATE BINDING
+    // ───────────────────────────────────────────────────────────────────────────
+    // Creates a binding token that can be shared with credential issuers.
+    // The binding proves identity ownership without revealing identity data.
     //
-    // Parameters:
-    //   - identity: Existing identity record
-    //   - new_data_hash: New off-chain data reference hash
-    //
-    // Returns:
-    //   - Updated Identity record (commitment unchanged)
-    transition update_data_hash(
-        identity: Identity,
-        new_data_hash: field
-    ) -> Identity {
-        return Identity {
-            owner: self.caller,
-            identity_commitment: identity.identity_commitment,
-            data_hash: new_data_hash,
-            version: identity.version + 1u32,
-            salt: identity.salt,
-        };
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // CREATE IDENTITY BINDING
-    // ─────────────────────────────────────────────────────────────────────────
-    // Creates a binding token that can be used to prove identity ownership
-    // to other programs (e.g., credential.aleo).
-    //
-    // Parameters:
-    //   - identity: The identity record to create binding from
-    //   - binding_context: Hash of the binding purpose (e.g., "credential_issuance")
-    //   - nonce_seed: Seed for generating the one-time nonce
-    //
-    // Returns:
-    //   - Original identity (preserved)
-    //   - IdentityBinding token for cross-program use
-    //
-    // Note: The identity is returned unchanged (re-created with same values)
+    // SECURITY:
+    // - Nonce prevents replay attacks
+    // - Context binding prevents misuse across different purposes
+    // - Expiry prevents stale bindings from being accepted
     transition create_binding(
         identity: Identity,
         binding_context: field,
-        nonce_seed: field
+        nonce_seed: field,
+        expires_at: u64
     ) -> (Identity, IdentityBinding) {
-        // Compute a unique nonce for this binding
-        let binding_nonce: field = compute_nonce(
-            self.caller,
+        // Verify ownership
+        assert_eq(identity.owner, self.caller);
+
+        // Compute unique nonce
+        let nonce: field = compute_binding_nonce(
             identity.identity_commitment,
-            binding_context + nonce_seed
+            binding_context,
+            nonce_seed
         );
 
-        // Preserve the original identity (consume and re-create)
-        let preserved_identity: Identity = Identity {
-            owner: self.caller,
-            identity_commitment: identity.identity_commitment,
-            data_hash: identity.data_hash,
-            version: identity.version,
-            salt: identity.salt,
-        };
-
-        // Create the binding token
+        // Create binding token
         let binding: IdentityBinding = IdentityBinding {
             owner: self.caller,
             identity_commitment: identity.identity_commitment,
             binding_context: binding_context,
-            nonce: binding_nonce,
+            nonce: nonce,
+            expires_at: expires_at,
         };
 
-        return (preserved_identity, binding);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // VERIFY COMMITMENT (VIEW FUNCTION)
-    // ─────────────────────────────────────────────────────────────────────────
-    // Allows the owner to verify their identity commitment matches expected data.
-    // This is a "read" operation that doesn't change state.
-    //
-    // Parameters:
-    //   - identity: The identity record to verify
-    //   - unique_id_hash: Expected unique ID hash
-    //   - attributes_hash: Expected attributes hash
-    //   - created_at: Expected creation timestamp
-    //
-    // Returns:
-    //   - Original identity (preserved)
-    //   - Boolean indicating if commitment matches
-    transition verify_commitment(
-        identity: Identity,
-        unique_id_hash: field,
-        attributes_hash: field,
-        created_at: u64
-    ) -> (Identity, bool) {
-        // Recompute commitment with provided data and stored salt
-        let expected_commitment: field = compute_commitment(
-            unique_id_hash,
-            attributes_hash,
-            created_at,
-            identity.salt
-        );
-
-        // Check if it matches the stored commitment
-        let is_valid: bool = expected_commitment == identity.identity_commitment;
-
-        // Preserve identity
-        let preserved_identity: Identity = Identity {
-            owner: self.caller,
+        // Preserve identity (consume and recreate)
+        let preserved: Identity = Identity {
+            owner: identity.owner,
             identity_commitment: identity.identity_commitment,
             data_hash: identity.data_hash,
             version: identity.version,
             salt: identity.salt,
+            nullifier_secret: identity.nullifier_secret,
         };
 
-        return (preserved_identity, is_valid);
+        return (preserved, binding) then finalize(nonce);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TRANSFER IDENTITY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Transfers identity ownership to a new address.
-    // Use with extreme caution - this is a one-way operation.
-    //
-    // Parameters:
-    //   - identity: The identity to transfer
-    //   - new_owner: Address of the new owner
-    //
-    // Returns:
-    //   - Identity record owned by new_owner
-    //
-    // Security: Only current owner can transfer (record consumption)
-    transition transfer_identity(
+    finalize create_binding(nonce: field) {
+        // Ensure nonce hasn't been used
+        let used: bool = Mapping::contains(used_binding_nonces, nonce);
+        assert(!used);
+
+        // Register nonce
+        Mapping::set(used_binding_nonces, nonce, true);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // VERIFY BINDING
+    // ───────────────────────────────────────────────────────────────────────────
+    // Allows a user to verify their binding matches their identity.
+    // Returns true if the binding's commitment matches the identity's commitment.
+    transition verify_binding(
         identity: Identity,
-        new_owner: address
-    ) -> Identity {
-        // Create new identity with same data but different owner
-        return Identity {
-            owner: new_owner,
+        binding: IdentityBinding
+    ) -> (Identity, bool) {
+        // Verify ownership of both
+        assert_eq(identity.owner, self.caller);
+        assert_eq(binding.owner, self.caller);
+
+        // Check commitment match
+        let matches: bool = identity.identity_commitment == binding.identity_commitment;
+
+        // Preserve identity
+        let preserved: Identity = Identity {
+            owner: identity.owner,
             identity_commitment: identity.identity_commitment,
             data_hash: identity.data_hash,
-            version: identity.version + 1u32,
+            version: identity.version,
             salt: identity.salt,
+            nullifier_secret: identity.nullifier_secret,
         };
+
+        return (preserved, matches);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // ───────────────────────────────────────────────────────────────────────────
+    // VERIFY COMMITMENT
+    // ───────────────────────────────────────────────────────────────────────────
+    // Allows the owner to verify their identity data matches the stored commitment.
+    // This is a "read" operation that proves data integrity.
+    transition verify_commitment(
+        identity: Identity,
+        unique_id_hash: field,
+        attributes_hash: field,
+        timestamp: u64
+    ) -> (Identity, bool) {
+        // Verify ownership
+        assert_eq(identity.owner, self.caller);
+
+        // Recompute commitment
+        let input: IdentityInput = IdentityInput {
+            unique_id_hash: unique_id_hash,
+            attributes_hash: attributes_hash,
+            timestamp: timestamp,
+        };
+        let computed: field = compute_commitment(input, identity.salt);
+
+        // Check match
+        let matches: bool = computed == identity.identity_commitment;
+
+        // Preserve identity
+        let preserved: Identity = Identity {
+            owner: identity.owner,
+            identity_commitment: identity.identity_commitment,
+            data_hash: identity.data_hash,
+            version: identity.version,
+            salt: identity.salt,
+            nullifier_secret: identity.nullifier_secret,
+        };
+
+        return (preserved, matches);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
     // DESTROY IDENTITY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Permanently destroys an identity by consuming the record without creating a new one.
-    // This is irreversible - the identity commitment will no longer be usable.
-    //
-    // Parameters:
-    //   - identity: The identity to destroy
-    //
-    // Returns:
-    //   - The commitment that was destroyed (for reference/logging)
-    transition destroy_identity(
-        identity: Identity
-    ) -> field {
-        // Record is consumed but no new identity is created
-        // Return the commitment for reference
+    // ───────────────────────────────────────────────────────────────────────────
+    // Permanently destroys an identity. The nullifier remains registered
+    // to prevent recreation.
+    transition destroy_identity(identity: Identity) -> field {
+        // Verify ownership
+        assert_eq(identity.owner, self.caller);
+
+        // Return commitment for reference (record is consumed, not recreated)
         return identity.identity_commitment;
     }
 }

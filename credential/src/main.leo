@@ -1,126 +1,121 @@
-// ZK-Access: Credential Issuance & Management Program
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZK-ACCESS: CREDENTIAL SYSTEM (HARDENED)
 // Program: credential.aleo
-// Version: 1.0.0
+// Version: 2.0.0
 //
-// This program implements privacy-preserving verifiable credentials on Aleo.
-// Credentials are encrypted records bound to a user's identity commitment.
-// Issuers can issue and revoke credentials without revealing credential contents.
+// This program implements privacy-preserving verifiable credentials with:
+// - Real ZK proof generation (not stubs)
+// - Cryptographic issuer authorization
+// - Privacy-preserving revocation via nullifiers
+// - Selective disclosure proofs
+//
+// SECURITY MODEL:
+// - Credentials are encrypted records (only holder can decrypt)
+// - Issuer authorization checked on-chain in finalize
+// - Revocation uses nullifiers (unlinkable to credentials)
+// - Proofs reveal ONLY the boolean result, never underlying data
+// ═══════════════════════════════════════════════════════════════════════════════
 
 program credential.aleo {
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTANTS - Credential Type Identifiers
+    // CONSTANTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Standard credential types for interoperability
-    const TYPE_KYC: u8 = 1u8;              // Know Your Customer verification
-    const TYPE_AGE: u8 = 2u8;              // Age verification
-    const TYPE_ACCREDITATION: u8 = 3u8;   // Accredited investor status
-    const TYPE_JURISDICTION: u8 = 4u8;    // Jurisdiction/country verification
-    const TYPE_COMPOSITE: u8 = 255u8;     // Multi-claim credential
-
-    // Credential status flags
-    const STATUS_ACTIVE: u8 = 1u8;
-    const STATUS_SUSPENDED: u8 = 2u8;
-    const STATUS_EXPIRED: u8 = 3u8;
+    // Credential type identifiers
+    const TYPE_KYC: u8 = 1u8;
+    const TYPE_AGE: u8 = 2u8;
+    const TYPE_ACCREDITATION: u8 = 3u8;
+    const TYPE_JURISDICTION: u8 = 4u8;
+    const TYPE_COMPOSITE: u8 = 255u8;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // RECORD DEFINITIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Primary credential record - encrypted and owned by the credential subject
+    // Primary credential record - ALL fields encrypted
     record Credential {
-        // The user who holds this credential
+        // Credential holder (only they can use this credential)
         owner: address,
 
-        // Address of the issuing entity (e.g., KYC provider, DAO)
+        // Issuing entity address
         issuer: address,
 
-        // Commitment binding this credential to the subject's identity
-        // Must match the identity_commitment from identity.aleo
+        // Binding to holder's identity (from identity.aleo)
         subject_commitment: field,
 
-        // Type of credential (see constants above)
+        // Credential type classification
         credential_type: u8,
 
-        // ─────────────────────────────────────────────────────────────────────
-        // CLAIM DATA - The actual credential assertions
-        // ─────────────────────────────────────────────────────────────────────
-
-        // Age verification: subject is over 18 years old
-        over_18: bool,
-
-        // Age verification: subject is over 21 years old
-        over_21: bool,
+        // ─── CLAIM DATA (all encrypted) ───
+        // Age in years (for age-based proofs)
+        age: u8,
 
         // Country code (ISO 3166-1 numeric)
-        // Examples: 840 = USA, 826 = UK, 276 = Germany, 392 = Japan
         country_code: u16,
 
-        // KYC verification passed
+        // KYC verification status
         kyc_passed: bool,
 
-        // Accredited investor status (SEC Rule 501 or equivalent)
+        // Accredited investor status
         accredited_investor: bool,
 
-        // Risk score (0-255, lower is better)
+        // Risk assessment score (0-255)
         risk_score: u8,
 
-        // ─────────────────────────────────────────────────────────────────────
-        // METADATA
-        // ─────────────────────────────────────────────────────────────────────
-
-        // Block height when credential was issued
+        // ─── METADATA ───
+        // Block height when issued
         issued_at: u64,
 
-        // Block height when credential expires (0 = never)
+        // Block height when expires (0 = never)
         expires_at: u64,
 
-        // Unique credential identifier hash
-        credential_hash: field,
+        // Unique credential identifier
+        credential_id: field,
 
         // Nullifier for revocation checking
-        // This is derived: H(credential_hash || revocation_secret)
+        // revocation_nullifier = H(credential_id || revocation_secret)
         revocation_nullifier: field,
+
+        // Salt for proof generation (prevents proof correlation)
+        proof_salt: field,
     }
 
-    // Lightweight credential proof token for selective disclosure
-    // Used to prove specific claims without revealing full credential
+    // ZK Proof of a specific claim - this is what gets shared with verifiers
+    // The proof itself (ZK-SNARK) guarantees the claim without revealing credential data
     record CredentialProof {
+        // Who generated this proof (must match credential owner)
         owner: address,
-        // Which credential this proof is derived from
-        credential_hash: field,
-        // The specific claim being proven
-        claim_type: u8,
-        // The claim value (encoded as field)
-        claim_value: field,
-        // Proof timestamp
-        proven_at: u64,
-        // Binding to prevent replay
-        nonce: field,
-    }
 
-    // Issuer authorization token - held by authorized issuers
-    record IssuerToken {
-        owner: address,
-        // Hash of issuer's credentials/certification
-        issuer_id: field,
-        // What types of credentials this issuer can issue
-        authorized_types: u32,  // Bitfield of credential types
-        // When this authorization was granted
-        authorized_at: u64,
-        // Authorization expiry
+        // Hash identifying which claim was proven
+        // claim_hash = H(credential_id || claim_type || claim_result || proof_nonce)
+        claim_hash: field,
+
+        // Type of claim proven (age, kyc, country, etc.)
+        claim_type: u8,
+
+        // The proven assertion (true/false for predicates, encoded value for ranges)
+        // For age >= 18: claim_result = 1 (true) or 0 (false)
+        // For country check: claim_result = 1 (allowed) or 0 (restricted)
+        claim_result: field,
+
+        // Verifier context - who this proof is intended for
+        // Prevents proof reuse across different verifiers
+        verifier_context: field,
+
+        // Block height when proof was generated
+        proven_at: u64,
+
+        // One-time nonce - prevents proof replay
+        proof_nonce: field,
+
+        // Credential expiry (passed through for verifier to check)
         expires_at: u64,
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // STRUCT DEFINITIONS
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // Credential claim data for computing hashes
+    // Struct for claim data (used in hashing)
     struct ClaimData {
-        over_18: bool,
-        over_21: bool,
+        age: u8,
         country_code: u16,
         kyc_passed: bool,
         accredited_investor: bool,
@@ -128,39 +123,32 @@ program credential.aleo {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // MAPPINGS (PUBLIC ON-CHAIN STATE)
+    // MAPPINGS (PUBLIC STATE)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Authorized issuers registry
-    // Key: issuer address
-    // Value: boolean (true = authorized, false/missing = not authorized)
-    mapping authorized_issuers: address => bool;
-
-    // Issuer metadata (optional, for transparency)
-    // Key: issuer address
-    // Value: metadata hash (points to off-chain issuer details)
-    mapping issuer_metadata: address => field;
-
-    // Revocation registry using nullifiers
-    // Key: revocation_nullifier
-    // Value: boolean (true = revoked)
-    // PRIVACY: Nullifiers cannot be linked to credentials without the secret
-    mapping revoked_nullifiers: field => bool;
-
-    // Credential count per issuer (for analytics, optional)
-    mapping issuer_credential_count: address => u64;
-
-    // Global admin for issuer management
-    // In production, this would be a multisig or DAO
+    // Admin address (set once during deployment)
     mapping admin: u8 => address;
 
+    // Authorized credential issuers
+    // Key: issuer address, Value: true if authorized
+    mapping authorized_issuers: address => bool;
+
+    // Revocation registry using nullifiers
+    // Key: revocation_nullifier, Value: true if revoked
+    // PRIVACY: Nullifiers are unlinkable to credentials without the secret
+    mapping revoked_nullifiers: field => bool;
+
+    // Issuer nonce registry - prevents credential issuance replay
+    mapping issuer_nonces: field => bool;
+
     // ═══════════════════════════════════════════════════════════════════════════
-    // INLINE HELPER FUNCTIONS
+    // INLINE FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Compute credential hash from all credential data
-    inline compute_credential_hash(
+    // Compute credential ID from issuance data
+    inline compute_credential_id(
         issuer: address,
+        recipient: address,
         subject_commitment: field,
         claims: ClaimData,
         issued_at: u64,
@@ -168,348 +156,180 @@ program credential.aleo {
     ) -> field {
         let claims_hash: field = BHP256::hash_to_field(claims);
         let issuer_hash: field = BHP256::hash_to_field(issuer);
+        let recipient_hash: field = BHP256::hash_to_field(recipient);
 
         return BHP256::hash_to_field(
-            issuer_hash + subject_commitment + claims_hash +
-            (issued_at as field) + salt
+            issuer_hash + recipient_hash + subject_commitment +
+            claims_hash + (issued_at as field) + salt
         );
     }
 
-    // Compute revocation nullifier from credential hash and secret
+    // Compute revocation nullifier
     inline compute_revocation_nullifier(
-        credential_hash: field,
+        credential_id: field,
         revocation_secret: field
     ) -> field {
-        return BHP256::hash_to_field(credential_hash + revocation_secret);
+        return BHP256::hash_to_field(credential_id + revocation_secret);
     }
 
-    // Encode a boolean claim as a field
-    inline bool_to_field(value: bool) -> field {
-        return value ? 1field : 0field;
+    // Compute proof nonce (unique per proof)
+    inline compute_proof_nonce(
+        credential_id: field,
+        verifier_context: field,
+        block_height: u64,
+        user_seed: field
+    ) -> field {
+        return BHP256::hash_to_field(
+            credential_id + verifier_context + (block_height as field) + user_seed
+        );
+    }
+
+    // Compute claim hash (binds proof to specific claim)
+    inline compute_claim_hash(
+        credential_id: field,
+        claim_type: u8,
+        claim_result: field,
+        proof_nonce: field
+    ) -> field {
+        return BHP256::hash_to_field(
+            credential_id + (claim_type as field) + claim_result + proof_nonce
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // ADMIN TRANSITIONS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // INITIALIZE ADMIN
-    // ─────────────────────────────────────────────────────────────────────────
-    // Sets the initial admin address. Can only be called once.
-    // In production, this would be called during program deployment.
+    // Initialize admin (one-time setup)
     transition initialize_admin(admin_address: address) {
         return then finalize(admin_address);
     }
 
     finalize initialize_admin(admin_address: address) {
-        // Check that admin hasn't been set yet
-        let existing: bool = Mapping::contains(admin, 0u8);
-        assert(!existing);
-
-        // Set the admin
+        let exists: bool = Mapping::contains(admin, 0u8);
+        assert(!exists);
         Mapping::set(admin, 0u8, admin_address);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // AUTHORIZE ISSUER
-    // ─────────────────────────────────────────────────────────────────────────
-    // Adds an address to the authorized issuers registry.
-    // Only admin can call this.
-    //
-    // Parameters:
-    //   - issuer: Address to authorize
-    //   - metadata_hash: Hash of issuer metadata (name, certification, etc.)
-    transition authorize_issuer(
-        issuer: address,
-        metadata_hash: field
-    ) {
-        return then finalize(self.caller, issuer, metadata_hash);
+    // Authorize a new issuer
+    transition authorize_issuer(issuer: address) {
+        return then finalize(self.caller, issuer);
     }
 
-    finalize authorize_issuer(
-        caller: address,
-        issuer: address,
-        metadata_hash: field
-    ) {
-        // Verify caller is admin
-        let admin_address: address = Mapping::get(admin, 0u8);
-        assert_eq(caller, admin_address);
-
-        // Authorize the issuer
+    finalize authorize_issuer(caller: address, issuer: address) {
+        let admin_addr: address = Mapping::get(admin, 0u8);
+        assert_eq(caller, admin_addr);
         Mapping::set(authorized_issuers, issuer, true);
-        Mapping::set(issuer_metadata, issuer, metadata_hash);
-        Mapping::set(issuer_credential_count, issuer, 0u64);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // DEAUTHORIZE ISSUER
-    // ─────────────────────────────────────────────────────────────────────────
-    // Removes an address from the authorized issuers registry.
-    // Only admin can call this.
-    // Note: This does NOT automatically revoke issued credentials.
+    // Deauthorize an issuer
     transition deauthorize_issuer(issuer: address) {
         return then finalize(self.caller, issuer);
     }
 
     finalize deauthorize_issuer(caller: address, issuer: address) {
-        // Verify caller is admin
-        let admin_address: address = Mapping::get(admin, 0u8);
-        assert_eq(caller, admin_address);
-
-        // Remove authorization
+        let admin_addr: address = Mapping::get(admin, 0u8);
+        assert_eq(caller, admin_addr);
         Mapping::set(authorized_issuers, issuer, false);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CREDENTIAL ISSUANCE TRANSITIONS
+    // CREDENTIAL ISSUANCE
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ISSUE CREDENTIAL
-    // ─────────────────────────────────────────────────────────────────────────
-    // Issues a new credential to a user.
-    // Only authorized issuers can call this.
-    //
-    // Parameters:
-    //   - recipient: Address that will own the credential
-    //   - subject_commitment: Identity commitment from identity.aleo
-    //   - credential_type: Type of credential being issued
-    //   - over_18: Age claim (>=18)
-    //   - over_21: Age claim (>=21)
-    //   - country_code: ISO 3166-1 numeric country code
-    //   - kyc_passed: KYC verification status
-    //   - accredited_investor: Accredited investor status
-    //   - risk_score: Risk assessment score
-    //   - issued_at: Block height of issuance
-    //   - expires_at: Expiration block height (0 = never)
-    //   - salt: Random salt for credential hash
-    //   - revocation_secret: Secret for generating revocation nullifier
-    //
-    // Returns:
-    //   - Credential record owned by recipient
-    //
-    // Security:
-    //   - Issuer authorization checked in finalize
-    //   - revocation_secret should be stored securely by issuer
+    // Issue a credential to a user
+    // Only authorized issuers can call this (enforced in finalize)
     transition issue_credential(
         recipient: address,
         subject_commitment: field,
         credential_type: u8,
-        over_18: bool,
-        over_21: bool,
+        age: u8,
         country_code: u16,
         kyc_passed: bool,
         accredited_investor: bool,
         risk_score: u8,
         issued_at: u64,
         expires_at: u64,
-        salt: field,
-        revocation_secret: field
+        issuance_salt: field,
+        revocation_secret: field,
+        proof_salt: field
     ) -> Credential {
-        // Construct claim data for hashing
+        // Build claims struct
         let claims: ClaimData = ClaimData {
-            over_18: over_18,
-            over_21: over_21,
+            age: age,
             country_code: country_code,
             kyc_passed: kyc_passed,
             accredited_investor: accredited_investor,
             risk_score: risk_score,
         };
 
-        // Compute credential hash
-        let credential_hash: field = compute_credential_hash(
+        // Compute credential ID
+        let credential_id: field = compute_credential_id(
             self.caller,
+            recipient,
             subject_commitment,
             claims,
             issued_at,
-            salt
+            issuance_salt
         );
 
         // Compute revocation nullifier
         let revocation_nullifier: field = compute_revocation_nullifier(
-            credential_hash,
+            credential_id,
             revocation_secret
         );
 
-        // Create the credential record
+        // Compute issuance nonce for replay prevention
+        let issuance_nonce: field = BHP256::hash_to_field(
+            credential_id + revocation_secret
+        );
+
+        // Create credential record (encrypted, owned by recipient)
         let credential: Credential = Credential {
             owner: recipient,
             issuer: self.caller,
             subject_commitment: subject_commitment,
             credential_type: credential_type,
-            over_18: over_18,
-            over_21: over_21,
+            age: age,
             country_code: country_code,
             kyc_passed: kyc_passed,
             accredited_investor: accredited_investor,
             risk_score: risk_score,
             issued_at: issued_at,
             expires_at: expires_at,
-            credential_hash: credential_hash,
+            credential_id: credential_id,
             revocation_nullifier: revocation_nullifier,
+            proof_salt: proof_salt,
         };
 
-        return credential then finalize(self.caller);
+        return credential then finalize(self.caller, issuance_nonce);
     }
 
-    finalize issue_credential(issuer: address) {
+    finalize issue_credential(issuer: address, issuance_nonce: field) {
         // Verify issuer is authorized
         let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
         assert(is_authorized);
 
-        // Increment credential count
-        let current_count: u64 = Mapping::get_or_use(issuer_credential_count, issuer, 0u64);
-        Mapping::set(issuer_credential_count, issuer, current_count + 1u64);
-    }
+        // Check issuance nonce hasn't been used (prevent replay)
+        let nonce_used: bool = Mapping::get_or_use(issuer_nonces, issuance_nonce, false);
+        assert(!nonce_used);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ISSUE KYC CREDENTIAL (Convenience Function)
-    // ─────────────────────────────────────────────────────────────────────────
-    // Simplified credential issuance for KYC-only credentials.
-    transition issue_kyc_credential(
-        recipient: address,
-        subject_commitment: field,
-        kyc_passed: bool,
-        country_code: u16,
-        issued_at: u64,
-        expires_at: u64,
-        salt: field,
-        revocation_secret: field
-    ) -> Credential {
-        let claims: ClaimData = ClaimData {
-            over_18: false,
-            over_21: false,
-            country_code: country_code,
-            kyc_passed: kyc_passed,
-            accredited_investor: false,
-            risk_score: 0u8,
-        };
-
-        let credential_hash: field = compute_credential_hash(
-            self.caller,
-            subject_commitment,
-            claims,
-            issued_at,
-            salt
-        );
-
-        let revocation_nullifier: field = compute_revocation_nullifier(
-            credential_hash,
-            revocation_secret
-        );
-
-        return Credential {
-            owner: recipient,
-            issuer: self.caller,
-            subject_commitment: subject_commitment,
-            credential_type: TYPE_KYC,
-            over_18: false,
-            over_21: false,
-            country_code: country_code,
-            kyc_passed: kyc_passed,
-            accredited_investor: false,
-            risk_score: 0u8,
-            issued_at: issued_at,
-            expires_at: expires_at,
-            credential_hash: credential_hash,
-            revocation_nullifier: revocation_nullifier,
-        } then finalize(self.caller);
-    }
-
-    finalize issue_kyc_credential(issuer: address) {
-        let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
-        assert(is_authorized);
-
-        let current_count: u64 = Mapping::get_or_use(issuer_credential_count, issuer, 0u64);
-        Mapping::set(issuer_credential_count, issuer, current_count + 1u64);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ISSUE AGE CREDENTIAL (Convenience Function)
-    // ─────────────────────────────────────────────────────────────────────────
-    transition issue_age_credential(
-        recipient: address,
-        subject_commitment: field,
-        over_18: bool,
-        over_21: bool,
-        issued_at: u64,
-        expires_at: u64,
-        salt: field,
-        revocation_secret: field
-    ) -> Credential {
-        let claims: ClaimData = ClaimData {
-            over_18: over_18,
-            over_21: over_21,
-            country_code: 0u16,
-            kyc_passed: false,
-            accredited_investor: false,
-            risk_score: 0u8,
-        };
-
-        let credential_hash: field = compute_credential_hash(
-            self.caller,
-            subject_commitment,
-            claims,
-            issued_at,
-            salt
-        );
-
-        let revocation_nullifier: field = compute_revocation_nullifier(
-            credential_hash,
-            revocation_secret
-        );
-
-        return Credential {
-            owner: recipient,
-            issuer: self.caller,
-            subject_commitment: subject_commitment,
-            credential_type: TYPE_AGE,
-            over_18: over_18,
-            over_21: over_21,
-            country_code: 0u16,
-            kyc_passed: false,
-            accredited_investor: false,
-            risk_score: 0u8,
-            issued_at: issued_at,
-            expires_at: expires_at,
-            credential_hash: credential_hash,
-            revocation_nullifier: revocation_nullifier,
-        } then finalize(self.caller);
-    }
-
-    finalize issue_age_credential(issuer: address) {
-        let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
-        assert(is_authorized);
-
-        let current_count: u64 = Mapping::get_or_use(issuer_credential_count, issuer, 0u64);
-        Mapping::set(issuer_credential_count, issuer, current_count + 1u64);
+        // Register nonce
+        Mapping::set(issuer_nonces, issuance_nonce, true);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // REVOCATION TRANSITIONS
+    // REVOCATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // REVOKE CREDENTIAL
-    // ─────────────────────────────────────────────────────────────────────────
-    // Revokes a credential using the revocation nullifier.
-    // Only the original issuer can revoke (must know the revocation_secret).
-    //
-    // Parameters:
-    //   - credential_hash: Hash of the credential to revoke
-    //   - revocation_secret: Secret used during issuance
-    //
-    // Privacy:
-    //   - The revocation nullifier is public, but cannot be linked to the
-    //     credential without knowing both credential_hash and revocation_secret
-    //   - Observers see only that "some credential" was revoked
+    // Revoke a credential using credential_id and revocation_secret
+    // Only the original issuer (who knows the secret) can revoke
     transition revoke_credential(
-        credential_hash: field,
+        credential_id: field,
         revocation_secret: field
     ) {
-        // Compute the nullifier
         let nullifier: field = compute_revocation_nullifier(
-            credential_hash,
+            credential_id,
             revocation_secret
         );
 
@@ -517,7 +337,7 @@ program credential.aleo {
     }
 
     finalize revoke_credential(issuer: address, nullifier: field) {
-        // Verify issuer is authorized (only authorized issuers can revoke)
+        // Verify caller is an authorized issuer
         let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
         assert(is_authorized);
 
@@ -529,304 +349,438 @@ program credential.aleo {
         Mapping::set(revoked_nullifiers, nullifier, true);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // BATCH REVOKE CREDENTIALS
-    // ─────────────────────────────────────────────────────────────────────────
-    // Revokes multiple credentials at once (up to 4).
-    // Useful for mass revocation events.
-    transition batch_revoke(
-        hash_1: field, secret_1: field,
-        hash_2: field, secret_2: field,
-        hash_3: field, secret_3: field,
-        hash_4: field, secret_4: field,
-        count: u8  // How many to actually revoke (1-4)
-    ) {
-        let nullifier_1: field = compute_revocation_nullifier(hash_1, secret_1);
-        let nullifier_2: field = compute_revocation_nullifier(hash_2, secret_2);
-        let nullifier_3: field = compute_revocation_nullifier(hash_3, secret_3);
-        let nullifier_4: field = compute_revocation_nullifier(hash_4, secret_4);
-
-        return then finalize(
-            self.caller,
-            nullifier_1, nullifier_2, nullifier_3, nullifier_4,
-            count
-        );
-    }
-
-    finalize batch_revoke(
-        issuer: address,
-        nullifier_1: field, nullifier_2: field,
-        nullifier_3: field, nullifier_4: field,
-        count: u8
-    ) {
-        // Verify issuer
-        let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
-        assert(is_authorized);
-
-        // Revoke based on count
-        if count >= 1u8 {
-            Mapping::set(revoked_nullifiers, nullifier_1, true);
-        }
-        if count >= 2u8 {
-            Mapping::set(revoked_nullifiers, nullifier_2, true);
-        }
-        if count >= 3u8 {
-            Mapping::set(revoked_nullifiers, nullifier_3, true);
-        }
-        if count >= 4u8 {
-            Mapping::set(revoked_nullifiers, nullifier_4, true);
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
-    // CREDENTIAL VERIFICATION TRANSITIONS
+    // ZK PROOF GENERATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // CHECK REVOCATION STATUS
-    // ─────────────────────────────────────────────────────────────────────────
-    // Allows a user to check if their credential has been revoked.
-    // The credential is preserved (consumed and re-created).
+    // ───────────────────────────────────────────────────────────────────────────
+    // PROVE AGE >= MINIMUM
+    // ───────────────────────────────────────────────────────────────────────────
+    // Generates a ZK proof that the credential holder's age >= minimum_age.
     //
-    // Returns:
-    //   - Preserved credential
-    //   - Boolean (true if credential is still valid, false if revoked)
-    transition check_revocation_status(
-        credential: Credential
-    ) -> (Credential, bool) {
-        // Preserve the credential
-        let preserved: Credential = Credential {
-            owner: self.caller,
-            issuer: credential.issuer,
-            subject_commitment: credential.subject_commitment,
-            credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
-            country_code: credential.country_code,
-            kyc_passed: credential.kyc_passed,
-            accredited_investor: credential.accredited_investor,
-            risk_score: credential.risk_score,
-            issued_at: credential.issued_at,
-            expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
-            revocation_nullifier: credential.revocation_nullifier,
-        };
-
-        // Return credential and a placeholder - actual check happens in finalize
-        // Note: In production, you'd want an async pattern here
-        return (preserved, true) then finalize(credential.revocation_nullifier);
-    }
-
-    finalize check_revocation_status(nullifier: field) {
-        // Check revocation status
-        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, nullifier, false);
-        // If revoked, the finalize will fail
-        assert(!is_revoked);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // VERIFY CREDENTIAL BINDING
-    // ─────────────────────────────────────────────────────────────────────────
-    // Verifies that a credential is bound to a specific identity commitment.
-    // Used by relying parties to verify credential-identity linkage.
-    transition verify_credential_binding(
+    // ZK CONSTRAINTS (enforced in circuit):
+    // 1. credential.owner == self.caller (only owner can generate proof)
+    // 2. credential.age >= minimum_age (the actual predicate)
+    // 3. current_block < credential.expires_at (not expired)
+    //
+    // PRIVACY:
+    // - minimum_age is public (the threshold being checked)
+    // - credential.age is NEVER revealed
+    // - Output is only boolean (pass/fail)
+    transition prove_age_minimum(
         credential: Credential,
-        expected_commitment: field
-    ) -> (Credential, bool) {
-        let is_bound: bool = credential.subject_commitment == expected_commitment;
-
-        let preserved: Credential = Credential {
-            owner: self.caller,
-            issuer: credential.issuer,
-            subject_commitment: credential.subject_commitment,
-            credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
-            country_code: credential.country_code,
-            kyc_passed: credential.kyc_passed,
-            accredited_investor: credential.accredited_investor,
-            risk_score: credential.risk_score,
-            issued_at: credential.issued_at,
-            expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
-            revocation_nullifier: credential.revocation_nullifier,
-        };
-
-        return (preserved, is_bound);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // SELECTIVE DISCLOSURE / PROOF GENERATION
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // PROVE OVER 18
-    // ─────────────────────────────────────────────────────────────────────────
-    // Creates a proof that the credential holder is over 18.
-    // The proof reveals only this specific claim, not other credential data.
-    transition prove_over_18(
-        credential: Credential,
+        minimum_age: u8,
         current_block: u64,
-        nonce_seed: field
+        verifier_context: field,
+        user_seed: field
     ) -> (Credential, CredentialProof) {
-        // Verify the claim exists
-        assert(credential.over_18);
+        // ═══ ZK CONSTRAINT 1: Ownership ═══
+        // The record system enforces this, but we assert explicitly
+        // This constraint is compiled into the ZK circuit
+        assert_eq(credential.owner, self.caller);
 
-        // Check expiration (if set)
-        let is_valid_expiry: bool = credential.expires_at == 0u64 ||
-                                    credential.expires_at > current_block;
-        assert(is_valid_expiry);
+        // ═══ ZK CONSTRAINT 2: Age predicate ═══
+        // This is the core ZK proof - we prove age >= minimum WITHOUT revealing age
+        // The circuit enforces: credential.age >= minimum_age
+        let age_sufficient: bool = credential.age >= minimum_age;
+        assert(age_sufficient);
 
-        // Compute unique nonce
-        let nonce: field = BHP256::hash_to_field(
-            credential.credential_hash + nonce_seed + (current_block as field)
+        // ═══ ZK CONSTRAINT 3: Expiry check ═══
+        // Ensure credential hasn't expired
+        let not_expired: bool = credential.expires_at == 0u64 ||
+                                current_block < credential.expires_at;
+        assert(not_expired);
+
+        // Compute proof nonce (unique to this proof)
+        let proof_nonce: field = compute_proof_nonce(
+            credential.credential_id,
+            verifier_context,
+            current_block,
+            user_seed
         );
 
-        // Create proof token
+        // Compute claim hash
+        let claim_hash: field = compute_claim_hash(
+            credential.credential_id,
+            TYPE_AGE,
+            1field,  // claim_result: true (age >= minimum)
+            proof_nonce
+        );
+
+        // Create proof record
         let proof: CredentialProof = CredentialProof {
             owner: self.caller,
-            credential_hash: credential.credential_hash,
+            claim_hash: claim_hash,
             claim_type: TYPE_AGE,
-            claim_value: 1field,  // true = over 18
+            claim_result: 1field,  // true
+            verifier_context: verifier_context,
             proven_at: current_block,
-            nonce: nonce,
+            proof_nonce: proof_nonce,
+            expires_at: credential.expires_at,
         };
 
         // Preserve credential
         let preserved: Credential = Credential {
-            owner: self.caller,
+            owner: credential.owner,
             issuer: credential.issuer,
             subject_commitment: credential.subject_commitment,
             credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
+            age: credential.age,
             country_code: credential.country_code,
             kyc_passed: credential.kyc_passed,
             accredited_investor: credential.accredited_investor,
             risk_score: credential.risk_score,
             issued_at: credential.issued_at,
             expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
+            credential_id: credential.credential_id,
             revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
         };
 
+        // Check revocation in finalize
         return (preserved, proof) then finalize(credential.revocation_nullifier);
     }
 
-    finalize prove_over_18(nullifier: field) {
-        // Ensure credential is not revoked
-        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, nullifier, false);
+    finalize prove_age_minimum(revocation_nullifier: field) {
+        // Check credential is not revoked
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PROVE KYC PASSED
-    // ─────────────────────────────────────────────────────────────────────────
-    // Creates a proof that the credential holder has passed KYC.
-    transition prove_kyc_passed(
+    // ───────────────────────────────────────────────────────────────────────────
+    // PROVE KYC STATUS
+    // ───────────────────────────────────────────────────────────────────────────
+    // Generates a ZK proof that kyc_passed == true
+    //
+    // ZK CONSTRAINTS:
+    // 1. credential.owner == self.caller
+    // 2. credential.kyc_passed == true
+    // 3. not expired
+    // 4. not revoked (finalize)
+    transition prove_kyc_status(
         credential: Credential,
         current_block: u64,
-        nonce_seed: field
+        verifier_context: field,
+        user_seed: field
     ) -> (Credential, CredentialProof) {
-        // Verify the claim exists
+        // ═══ ZK CONSTRAINT 1: Ownership ═══
+        assert_eq(credential.owner, self.caller);
+
+        // ═══ ZK CONSTRAINT 2: KYC predicate ═══
         assert(credential.kyc_passed);
 
-        // Check expiration
-        let is_valid_expiry: bool = credential.expires_at == 0u64 ||
-                                    credential.expires_at > current_block;
-        assert(is_valid_expiry);
+        // ═══ ZK CONSTRAINT 3: Expiry ═══
+        let not_expired: bool = credential.expires_at == 0u64 ||
+                                current_block < credential.expires_at;
+        assert(not_expired);
 
-        let nonce: field = BHP256::hash_to_field(
-            credential.credential_hash + nonce_seed + (current_block as field)
+        // Compute proof nonce
+        let proof_nonce: field = compute_proof_nonce(
+            credential.credential_id,
+            verifier_context,
+            current_block,
+            user_seed
+        );
+
+        // Compute claim hash
+        let claim_hash: field = compute_claim_hash(
+            credential.credential_id,
+            TYPE_KYC,
+            1field,
+            proof_nonce
         );
 
         let proof: CredentialProof = CredentialProof {
             owner: self.caller,
-            credential_hash: credential.credential_hash,
+            claim_hash: claim_hash,
             claim_type: TYPE_KYC,
-            claim_value: 1field,
+            claim_result: 1field,
+            verifier_context: verifier_context,
             proven_at: current_block,
-            nonce: nonce,
+            proof_nonce: proof_nonce,
+            expires_at: credential.expires_at,
         };
 
         let preserved: Credential = Credential {
-            owner: self.caller,
+            owner: credential.owner,
             issuer: credential.issuer,
             subject_commitment: credential.subject_commitment,
             credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
+            age: credential.age,
             country_code: credential.country_code,
             kyc_passed: credential.kyc_passed,
             accredited_investor: credential.accredited_investor,
             risk_score: credential.risk_score,
             issued_at: credential.issued_at,
             expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
+            credential_id: credential.credential_id,
             revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
         };
 
         return (preserved, proof) then finalize(credential.revocation_nullifier);
     }
 
-    finalize prove_kyc_passed(nullifier: field) {
-        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, nullifier, false);
+    finalize prove_kyc_status(revocation_nullifier: field) {
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // PROVE COUNTRY
-    // ─────────────────────────────────────────────────────────────────────────
-    // Proves residence in a specific country or NOT in a blocked country list.
-    transition prove_country(
+    // ───────────────────────────────────────────────────────────────────────────
+    // PROVE COUNTRY NOT RESTRICTED
+    // ───────────────────────────────────────────────────────────────────────────
+    // Proves the credential holder's country is NOT in a restricted set.
+    // The restricted set is defined by the caller (e.g., OFAC sanctions list).
+    //
+    // ZK CONSTRAINTS:
+    // 1. credential.owner == self.caller
+    // 2. credential.country_code != restricted_1
+    // 3. credential.country_code != restricted_2
+    // 4. credential.country_code != restricted_3
+    // 5. credential.country_code != restricted_4
+    // 6. not expired
+    // 7. not revoked (finalize)
+    //
+    // NOTE: We check against 4 restricted countries. For more, extend the list
+    // or use multiple proof calls.
+    transition prove_country_not_restricted(
         credential: Credential,
-        expected_country: u16,
+        restricted_1: u16,
+        restricted_2: u16,
+        restricted_3: u16,
+        restricted_4: u16,
         current_block: u64,
-        nonce_seed: field
-    ) -> (Credential, CredentialProof, bool) {
-        // Check if country matches
-        let country_matches: bool = credential.country_code == expected_country;
+        verifier_context: field,
+        user_seed: field
+    ) -> (Credential, CredentialProof) {
+        // ═══ ZK CONSTRAINT 1: Ownership ═══
+        assert_eq(credential.owner, self.caller);
 
-        // Check expiration
-        let is_valid_expiry: bool = credential.expires_at == 0u64 ||
-                                    credential.expires_at > current_block;
-        assert(is_valid_expiry);
+        // ═══ ZK CONSTRAINTS 2-5: Country not in restricted set ═══
+        // Each comparison is a circuit constraint
+        let not_restricted_1: bool = credential.country_code != restricted_1;
+        let not_restricted_2: bool = credential.country_code != restricted_2;
+        let not_restricted_3: bool = credential.country_code != restricted_3;
+        let not_restricted_4: bool = credential.country_code != restricted_4;
 
-        let nonce: field = BHP256::hash_to_field(
-            credential.credential_hash + nonce_seed + (current_block as field)
+        // All must be true (country not in any restricted)
+        assert(not_restricted_1);
+        assert(not_restricted_2);
+        assert(not_restricted_3);
+        assert(not_restricted_4);
+
+        // ═══ ZK CONSTRAINT 6: Expiry ═══
+        let not_expired: bool = credential.expires_at == 0u64 ||
+                                current_block < credential.expires_at;
+        assert(not_expired);
+
+        // Compute proof nonce
+        let proof_nonce: field = compute_proof_nonce(
+            credential.credential_id,
+            verifier_context,
+            current_block,
+            user_seed
+        );
+
+        // Include restricted countries in claim hash for binding
+        let restriction_hash: field = BHP256::hash_to_field(
+            (restricted_1 as field) + (restricted_2 as field) +
+            (restricted_3 as field) + (restricted_4 as field)
+        );
+
+        let claim_hash: field = BHP256::hash_to_field(
+            credential.credential_id + (TYPE_JURISDICTION as field) +
+            1field + proof_nonce + restriction_hash
         );
 
         let proof: CredentialProof = CredentialProof {
             owner: self.caller,
-            credential_hash: credential.credential_hash,
+            claim_hash: claim_hash,
             claim_type: TYPE_JURISDICTION,
-            claim_value: credential.country_code as field,
+            claim_result: 1field,  // true: not in restricted set
+            verifier_context: verifier_context,
             proven_at: current_block,
-            nonce: nonce,
+            proof_nonce: proof_nonce,
+            expires_at: credential.expires_at,
         };
 
         let preserved: Credential = Credential {
-            owner: self.caller,
+            owner: credential.owner,
             issuer: credential.issuer,
             subject_commitment: credential.subject_commitment,
             credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
+            age: credential.age,
             country_code: credential.country_code,
             kyc_passed: credential.kyc_passed,
             accredited_investor: credential.accredited_investor,
             risk_score: credential.risk_score,
             issued_at: credential.issued_at,
             expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
+            credential_id: credential.credential_id,
             revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
         };
 
-        return (preserved, proof, country_matches) then finalize(credential.revocation_nullifier);
+        return (preserved, proof) then finalize(credential.revocation_nullifier);
     }
 
-    finalize prove_country(nullifier: field) {
-        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, nullifier, false);
+    finalize prove_country_not_restricted(revocation_nullifier: field) {
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
+        assert(!is_revoked);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // PROVE ACCREDITED INVESTOR
+    // ───────────────────────────────────────────────────────────────────────────
+    transition prove_accredited_investor(
+        credential: Credential,
+        current_block: u64,
+        verifier_context: field,
+        user_seed: field
+    ) -> (Credential, CredentialProof) {
+        assert_eq(credential.owner, self.caller);
+        assert(credential.accredited_investor);
+
+        let not_expired: bool = credential.expires_at == 0u64 ||
+                                current_block < credential.expires_at;
+        assert(not_expired);
+
+        let proof_nonce: field = compute_proof_nonce(
+            credential.credential_id,
+            verifier_context,
+            current_block,
+            user_seed
+        );
+
+        let claim_hash: field = compute_claim_hash(
+            credential.credential_id,
+            TYPE_ACCREDITATION,
+            1field,
+            proof_nonce
+        );
+
+        let proof: CredentialProof = CredentialProof {
+            owner: self.caller,
+            claim_hash: claim_hash,
+            claim_type: TYPE_ACCREDITATION,
+            claim_result: 1field,
+            verifier_context: verifier_context,
+            proven_at: current_block,
+            proof_nonce: proof_nonce,
+            expires_at: credential.expires_at,
+        };
+
+        let preserved: Credential = Credential {
+            owner: credential.owner,
+            issuer: credential.issuer,
+            subject_commitment: credential.subject_commitment,
+            credential_type: credential.credential_type,
+            age: credential.age,
+            country_code: credential.country_code,
+            kyc_passed: credential.kyc_passed,
+            accredited_investor: credential.accredited_investor,
+            risk_score: credential.risk_score,
+            issued_at: credential.issued_at,
+            expires_at: credential.expires_at,
+            credential_id: credential.credential_id,
+            revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
+        };
+
+        return (preserved, proof) then finalize(credential.revocation_nullifier);
+    }
+
+    finalize prove_accredited_investor(revocation_nullifier: field) {
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
+        assert(!is_revoked);
+    }
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // PROVE COMPOSITE (AGE + KYC + COUNTRY)
+    // ───────────────────────────────────────────────────────────────────────────
+    // Proves multiple claims in a single proof for efficiency
+    transition prove_composite(
+        credential: Credential,
+        minimum_age: u8,
+        restricted_1: u16,
+        restricted_2: u16,
+        restricted_3: u16,
+        restricted_4: u16,
+        current_block: u64,
+        verifier_context: field,
+        user_seed: field
+    ) -> (Credential, CredentialProof) {
+        // Ownership
+        assert_eq(credential.owner, self.caller);
+
+        // Age check
+        assert(credential.age >= minimum_age);
+
+        // KYC check
+        assert(credential.kyc_passed);
+
+        // Country check
+        assert(credential.country_code != restricted_1);
+        assert(credential.country_code != restricted_2);
+        assert(credential.country_code != restricted_3);
+        assert(credential.country_code != restricted_4);
+
+        // Expiry
+        let not_expired: bool = credential.expires_at == 0u64 ||
+                                current_block < credential.expires_at;
+        assert(not_expired);
+
+        let proof_nonce: field = compute_proof_nonce(
+            credential.credential_id,
+            verifier_context,
+            current_block,
+            user_seed
+        );
+
+        // Include all parameters in claim hash
+        let params_hash: field = BHP256::hash_to_field(
+            (minimum_age as field) + (restricted_1 as field) +
+            (restricted_2 as field) + (restricted_3 as field) + (restricted_4 as field)
+        );
+
+        let claim_hash: field = BHP256::hash_to_field(
+            credential.credential_id + (TYPE_COMPOSITE as field) +
+            1field + proof_nonce + params_hash
+        );
+
+        let proof: CredentialProof = CredentialProof {
+            owner: self.caller,
+            claim_hash: claim_hash,
+            claim_type: TYPE_COMPOSITE,
+            claim_result: 1field,
+            verifier_context: verifier_context,
+            proven_at: current_block,
+            proof_nonce: proof_nonce,
+            expires_at: credential.expires_at,
+        };
+
+        let preserved: Credential = Credential {
+            owner: credential.owner,
+            issuer: credential.issuer,
+            subject_commitment: credential.subject_commitment,
+            credential_type: credential.credential_type,
+            age: credential.age,
+            country_code: credential.country_code,
+            kyc_passed: credential.kyc_passed,
+            accredited_investor: credential.accredited_investor,
+            risk_score: credential.risk_score,
+            issued_at: credential.issued_at,
+            expires_at: credential.expires_at,
+            credential_id: credential.credential_id,
+            revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
+        };
+
+        return (preserved, proof) then finalize(credential.revocation_nullifier);
+    }
+
+    finalize prove_composite(revocation_nullifier: field) {
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
 
@@ -834,41 +788,42 @@ program credential.aleo {
     // CREDENTIAL MANAGEMENT
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // TRANSFER CREDENTIAL
-    // ─────────────────────────────────────────────────────────────────────────
-    // Transfers credential to another address.
-    // WARNING: This breaks the identity binding! Use with extreme caution.
-    // In most cases, credentials should NOT be transferable.
-    transition transfer_credential(
-        credential: Credential,
-        new_owner: address
-    ) -> Credential {
-        return Credential {
-            owner: new_owner,
+    // Check if credential is revoked (for user's own verification)
+    transition check_revocation(
+        credential: Credential
+    ) -> (Credential, bool) {
+        assert_eq(credential.owner, self.caller);
+
+        let preserved: Credential = Credential {
+            owner: credential.owner,
             issuer: credential.issuer,
             subject_commitment: credential.subject_commitment,
             credential_type: credential.credential_type,
-            over_18: credential.over_18,
-            over_21: credential.over_21,
+            age: credential.age,
             country_code: credential.country_code,
             kyc_passed: credential.kyc_passed,
             accredited_investor: credential.accredited_investor,
             risk_score: credential.risk_score,
             issued_at: credential.issued_at,
             expires_at: credential.expires_at,
-            credential_hash: credential.credential_hash,
+            credential_id: credential.credential_id,
             revocation_nullifier: credential.revocation_nullifier,
+            proof_salt: credential.proof_salt,
         };
+
+        // The bool returned is a placeholder - real check happens in finalize
+        // If finalize fails, credential is revoked
+        return (preserved, true) then finalize(credential.revocation_nullifier);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // DESTROY CREDENTIAL
-    // ─────────────────────────────────────────────────────────────────────────
-    // Permanently destroys a credential.
-    // User may want to do this if the credential is compromised or no longer needed.
+    finalize check_revocation(revocation_nullifier: field) {
+        let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
+        assert(!is_revoked);
+    }
+
+    // Destroy a credential (user choice)
     transition destroy_credential(credential: Credential) -> field {
-        // Record is consumed but not re-created
-        return credential.credential_hash;
+        assert_eq(credential.owner, self.caller);
+        return credential.credential_id;
     }
 }

@@ -1,0 +1,6 @@
+{
+  "program": "verifier.aleo",
+  "version": "0.1.0",
+  "description": "ZK-Access: Composable proof verification for third-party protocols",
+  "license": "MIT"
+}

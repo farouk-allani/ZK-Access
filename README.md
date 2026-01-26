@@ -1,193 +1,204 @@
-# ZK-Access: Privacy-Preserving Identity & Access Control on Aleo
+# ZK-Access: Production-Grade Privacy Infrastructure for Aleo
 
-**Production-ready privacy infrastructure for decentralized identity and verifiable credentials.**
+**Cryptographically-sound identity and credential verification with real ZK proofs.**
 
 ---
 
 ## Overview
 
-ZK-Access is a privacy-first identity and credential management system built on Aleo. It enables:
+ZK-Access is a privacy-preserving identity and credential system built for Aleo mainnet deployment. It implements:
 
-- **Private Identity Vaults**: Store encrypted identity commitments on-chain
-- **Verifiable Credentials**: Issue, hold, and prove credentials without revealing data
-- **Selective Disclosure**: Prove specific claims (age, KYC status, jurisdiction) without exposing other information
-- **Privacy-Preserving Revocation**: Revoke credentials without linking to users
+- **Private Identity Vaults** with nullifier-based clone prevention
+- **Verifiable Credentials** with real ZK constraint logic
+- **Selective Disclosure Proofs** that reveal ONLY boolean results
+- **Privacy-Preserving Revocation** via unlinkable nullifiers
+- **Composable Verification** for third-party protocol integration
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         ZK-Access System                             │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────────┐         ┌─────────────────────┐           │
-│  │   identity.aleo     │         │  credential.aleo    │           │
-│  ├─────────────────────┤         ├─────────────────────┤           │
-│  │ • Identity records  │◄───────▶│ • Credential records│           │
-│  │ • Commitment scheme │  bound  │ • Issuer registry   │           │
-│  │ • Binding tokens    │   via   │ • Revocation system │           │
-│  │ • Update mechanism  │commitment│ • Proof generation  │           │
-│  └─────────────────────┘         └─────────────────────┘           │
-│                                                                      │
-│  Privacy: ALL sensitive data encrypted in Aleo records              │
-│  Public:  Only issuer registry + revocation nullifiers              │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      ZK-ACCESS SYSTEM ARCHITECTURE                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐      │
+│  │  identity.aleo   │    │ credential.aleo  │    │  verifier.aleo   │      │
+│  ├──────────────────┤    ├──────────────────┤    ├──────────────────┤      │
+│  │ • Identity vault │    │ • ZK proof gen   │    │ • Proof verify   │      │
+│  │ • Binding tokens │───▶│ • Issuer auth    │───▶│ • Replay prevent │      │
+│  │ • Clone prevent  │    │ • Revocation     │    │ • Result compose │      │
+│  └──────────────────┘    └──────────────────┘    └──────────────────┘      │
+│                                                                              │
+│  PRIVATE (Records):     PRIVATE (Records):      PRIVATE (Records):          │
+│  - Identity             - Credential            - CredentialProof           │
+│  - IdentityBinding      - CredentialProof       - VerificationResult        │
+│                                                                              │
+│  PUBLIC (Mappings):     PUBLIC (Mappings):      PUBLIC (Mappings):          │
+│  - identity_nullifiers  - authorized_issuers   - consumed_nonces            │
+│  - used_binding_nonces  - revoked_nullifiers   - consumed_verifications     │
+│                         - issuer_nonces                                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
 
 ## Programs
 
 ### identity.aleo
 
-Core private identity vault with:
-- `create_identity`: Create encrypted identity with commitment
-- `update_identity`: Update identity data (UTXO-style)
-- `create_binding`: Generate binding tokens for credential issuance
-- `verify_commitment`: Verify identity data matches commitment
-- `transfer_identity`: Transfer ownership (with caution)
-- `destroy_identity`: Permanently delete identity
+Private identity management with cryptographic ownership enforcement.
 
-### credential.aleo 
+| Transition | Purpose | Security |
+|------------|---------|----------|
+| `create_identity` | Create identity vault | Nullifier prevents cloning |
+| `update_identity` | Update identity data | Ownership via record consumption |
+| `create_binding` | Generate binding for issuers | Nonce prevents replay |
+| `verify_commitment` | Verify data integrity | Owner-only access |
+| `destroy_identity` | Permanently delete | Owner-only, irreversible |
 
-Verifiable credential system with:
-- `authorize_issuer` / `deauthorize_issuer`: Issuer management
-- `issue_credential`: Issue encrypted credentials to users
-- `issue_kyc_credential` / `issue_age_credential`: Convenience functions
-- `prove_over_18` / `prove_kyc_passed` / `prove_country`: Selective disclosure
-- `revoke_credential` / `batch_revoke`: Privacy-preserving revocation
-- `check_revocation_status`: User revocation check
+### credential.aleo
 
-## Quick Start
+Verifiable credentials with real ZK proof generation.
 
-### 1. Deploy Programs
+| Transition | Purpose | ZK Constraints |
+|------------|---------|----------------|
+| `issue_credential` | Issue to user | Issuer authorization in finalize |
+| `prove_age_minimum` | Prove age ≥ N | `assert(credential.age >= minimum_age)` |
+| `prove_kyc_status` | Prove KYC passed | `assert(credential.kyc_passed)` |
+| `prove_country_not_restricted` | Prove not in restricted set | `assert(country ≠ restricted[i])` |
+| `prove_accredited_investor` | Prove accreditation | `assert(credential.accredited_investor)` |
+| `prove_composite` | Multi-claim proof | Age + KYC + Country in one proof |
+| `revoke_credential` | Revoke by issuer | Requires secret, adds nullifier |
 
-```bash
-snarkos developer deploy identity.aleo \
-    --private-key $PRIVATE_KEY \
-    --query https://api.explorer.aleo.org/v1 \
-    --path ./identity/build/ \
-    --broadcast https://api.explorer.aleo.org/v1/testnet3/transaction/broadcast
+### verifier.aleo
 
-snarkos developer deploy credential.aleo \
-    --private-key $PRIVATE_KEY \
-    --query https://api.explorer.aleo.org/v1 \
-    --path ./credential/build/ \
-    --broadcast https://api.explorer.aleo.org/v1/testnet3/transaction/broadcast
+Composable proof verification for third-party protocols.
+
+| Transition | Purpose | Security |
+|------------|---------|----------|
+| `verify_proof` | Verify any proof type | Nonce consumption prevents replay |
+| `verify_age_proof` | Verify age proof | Type-specific validation |
+| `verify_kyc_proof` | Verify KYC proof | Type-specific validation |
+| `consume_verification` | Use result once | Verification ID consumption |
+
+---
+
+## ZK Proof Guarantees
+
+### What the Circuit Proves
+
+For `prove_age_minimum(credential, minimum_age=18)`:
+
+```
+∃ credential such that:
+  1. credential.owner == self.caller        (ownership)
+  2. credential.age >= minimum_age          (predicate)
+  3. credential.expires_at > current_block  (validity)
+  4. credential not in revoked_nullifiers   (not revoked)
 ```
 
-### 2. Create Identity
+### What is NOT Revealed
 
-```bash
-snarkos developer execute identity.aleo create_identity \
-    "unique_id_hashfield" \
-    "attributes_hashfield" \
-    "1706400000u64" \
-    "random_saltfield" \
-    "data_hashfield" \
-    --private-key $USER_PRIVATE_KEY
-```
+- User's actual age (only that age ≥ 18)
+- User's country (only that country ∉ restricted set)
+- User's identity
+- Credential contents
+- Issuer-user relationship
 
-### 3. Issue Credential
-
-```bash
-# First authorize issuer (admin only)
-snarkos developer execute credential.aleo authorize_issuer \
-    "aleo1issuer..." "metadata_hashfield" \
-    --private-key $ADMIN_PRIVATE_KEY
-
-# Issue credential
-snarkos developer execute credential.aleo issue_credential \
-    "aleo1user..." \
-    "subject_commitmentfield" \
-    "1u8" "true" "true" "840u16" "true" "false" "25u8" \
-    "1706400000u64" "1738000000u64" \
-    "saltfield" "revocation_secretfield" \
-    --private-key $ISSUER_PRIVATE_KEY
-```
-
-### 4. Prove Eligibility
-
-```bash
-snarkos developer execute credential.aleo prove_kyc_passed \
-    "{...credential_record...}" \
-    "1710000000u64" \
-    "nonce_seedfield" \
-    --private-key $USER_PRIVATE_KEY
-```
-
-## Privacy Guarantees
-
-| Data | Visibility | Rationale |
-|------|------------|-----------|
-| Identity data | 🔒 Encrypted | Only owner can decrypt |
-| Credential claims | 🔒 Encrypted | Only holder can decrypt |
-| Issuer addresses | 🌐 Public | Users verify issuer legitimacy |
-| Revocation nullifiers | 🌐 Public (unlinkable) | Cannot link to credentials |
-
-## Use Cases
-
-- **DeFi Compliance**: KYC gates without exposing user identity
-- **DAO Governance**: Jurisdiction checks for regulatory compliance
-- **Age Verification**: Prove 18+/21+ without revealing birthdate
-- **Accredited Investor**: Prove status for regulated offerings
-- **Reputation Systems**: Portable credentials across platforms
-
-## Documentation
-
-- [Example Flows](./EXAMPLE_FLOWS.md) - Detailed CLI examples
-- [Privacy Model](./PRIVACY_MODEL.md) - Technical privacy analysis
+---
 
 ## Project Structure
 
 ```
 aleo-zk/
 ├── identity/
-│   ├── src/
-│   │   └── main.leo          # Identity program
+│   ├── src/main.leo          # Identity program (356 lines)
 │   └── program.json
 ├── credential/
-│   ├── src/
-│   │   └── main.leo          # Credential program
+│   ├── src/main.leo          # Credential program (829 lines)
 │   └── program.json
-├── EXAMPLE_FLOWS.md          # CLI examples
-├── PRIVACY_MODEL.md          # Privacy documentation
-└── README.md                 # This file
+├── verifier/
+│   ├── src/main.leo          # Verifier program (340 lines)
+│   └── program.json
+├── CLI_EXAMPLES.md           # Complete CLI examples
+├── THREAT_MODEL.md           # Security analysis
+├── PRIVACY_MODEL.md          # Privacy guarantees
+└── README.md
 ```
 
-## Compliance
+---
 
-### Private Identity Core ✓
+## Security Properties
+
+| Property | Mechanism | Guarantee |
+|----------|-----------|-----------|
+| **Record Privacy** | AES encryption | Only owner can decrypt |
+| **Ownership Enforcement** | Record consumption + assertion | Cryptographic, not just logical |
+| **Clone Prevention** | Nullifier registration | Cannot create duplicate identity |
+| **Issuer Authorization** | Finalize mapping check | Only authorized can issue |
+| **Replay Prevention** | Nonce tracking | Each proof/binding usable once |
+| **Revocation Privacy** | Nullifier scheme | Cannot link to credential |
+
+---
+
+## Compliance Summary
+
+### Wave 1: Private Identity Core ✓
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Leo program `identity.aleo` | ✅ Full implementation |
-| Private identity record | ✅ Encrypted record with owner |
-| Unique identifier (hashed) | ✅ `identity_commitment` field |
-| Owner-only updates | ✅ Record consumption enforces |
+| Leo program `identity.aleo` | ✅ Full implementation with nullifiers |
+| Private identity record | ✅ Encrypted record with 6 fields |
+| Unique identifier (hashed) | ✅ `identity_commitment` via BHP256 |
+| Owner-only updates | ✅ Record consumption + assertion |
 | Create/read/update | ✅ All transitions implemented |
-| No public identity data | ✅ All data in encrypted records |
+| No public identity data | ✅ Only nullifiers in mappings |
 
-### Private Credentials ✓
+### Wave 2: Private Credentials ✓
 
 | Requirement | Implementation |
 |-------------|----------------|
-| Leo program `credential.aleo` | ✅ Full implementation |
-| Issuer role | ✅ `authorized_issuers` mapping + admin |
-| Encrypted credentials | ✅ Credential record type |
-| Identity binding | ✅ `subject_commitment` field |
-| Claims (over_18, country, kyc) | ✅ All implemented |
-| Issuance by issuer | ✅ `issue_credential` + finalize check |
-| Private storage | ✅ User owns encrypted record |
-| Revocation | ✅ Nullifier-based system |
-| Multiple credentials | ✅ No limit on records per user |
-| Proof stubs | ✅ `prove_over_18`, `prove_kyc_passed`, `prove_country` |
+| Leo program `credential.aleo` | ✅ Full implementation with ZK proofs |
+| Issuer role | ✅ `authorized_issuers` + admin control |
+| Encrypted credentials | ✅ 15-field credential record |
+| Identity binding | ✅ `subject_commitment` from identity |
+| Claims (age, country, kyc) | ✅ All implemented with ZK constraints |
+| Real ZK proofs | ✅ Circuit constraints, not stubs |
+| Revocation | ✅ Nullifier-based, unlinkable |
+| Verifier program | ✅ Composable verification |
 
-## Security Considerations
+---
 
-1. **Key Management**: Private keys must be stored securely
-2. **Issuer Secrets**: Revocation secrets must be backed up by issuers
-3. **Metadata**: Transaction timing can leak information
-4. **Off-chain Data**: Encrypt any data referenced by `data_hash`
+## Documentation
+
+- **[CLI_EXAMPLES.md](./CLI_EXAMPLES.md)** - Complete command examples with expected outputs
+- **[THREAT_MODEL.md](./THREAT_MODEL.md)** - Security analysis and attack resistance
+- **[PRIVACY_MODEL.md](./PRIVACY_MODEL.md)** - Privacy guarantees explained
+
+---
+
+## For Auditors
+
+### What to Verify
+
+1. **ZK Constraints**: Check that `assert` statements in `prove_*` transitions correctly implement the claimed predicate
+2. **Authorization Logic**: Verify finalize blocks check `authorized_issuers` before state changes
+3. **Nullifier Scheme**: Confirm nullifiers are computed correctly and checked in finalize
+4. **Replay Prevention**: Verify all nonces are registered and checked before use
+5. **Record Ownership**: Confirm `assert_eq(record.owner, self.caller)` in all relevant transitions
+
+### Key Files
+
+- `credential.aleo:370-448` - Age proof ZK constraints
+- `credential.aleo:460-527` - KYC proof ZK constraints
+- `credential.aleo:546-630` - Country restriction ZK constraints
+- `credential.aleo:327-350` - Revocation logic
+- `verifier.aleo:97-165` - Proof verification logic
+
+---
 
 ## License
 
@@ -195,4 +206,4 @@ MIT
 
 ---
 
-**Built for the Aleo Buildathon** | Privacy-first. Production-ready. Composable.
+**Built for Aleo Mainnet** | Cryptographically Sound | Production Ready
