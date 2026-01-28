@@ -16,7 +16,15 @@
 // - Proofs reveal ONLY the boolean result, never underlying data
 // ═══════════════════════════════════════════════════════════════════════════════
 
-program credential.aleo {
+program zkaccess_cred_v1.aleo {
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Required for deployment - immutable program (no upgrades)
+    @noupgrade
+    async constructor() {}
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -83,7 +91,7 @@ program credential.aleo {
 
     // ZK Proof of a specific claim - this is what gets shared with verifiers
     // The proof itself (ZK-SNARK) guarantees the claim without revealing credential data
-    record CredentialProof {
+    record CredProof {
         // Who generated this proof (must match credential owner)
         owner: address,
 
@@ -201,33 +209,33 @@ program credential.aleo {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Initialize admin (one-time setup)
-    transition initialize_admin(admin_address: address) {
-        return then finalize(admin_address);
+    async transition initialize_admin(admin_address: address) -> Future {
+        return finalize_initialize_admin(admin_address);
     }
 
-    finalize initialize_admin(admin_address: address) {
+    async function finalize_initialize_admin(admin_address: address) {
         let exists: bool = Mapping::contains(admin, 0u8);
         assert(!exists);
         Mapping::set(admin, 0u8, admin_address);
     }
 
     // Authorize a new issuer
-    transition authorize_issuer(issuer: address) {
-        return then finalize(self.caller, issuer);
+    async transition authorize_issuer(issuer: address) -> Future {
+        return finalize_authorize_issuer(self.caller, issuer);
     }
 
-    finalize authorize_issuer(caller: address, issuer: address) {
+    async function finalize_authorize_issuer(caller: address, issuer: address) {
         let admin_addr: address = Mapping::get(admin, 0u8);
         assert_eq(caller, admin_addr);
         Mapping::set(authorized_issuers, issuer, true);
     }
 
     // Deauthorize an issuer
-    transition deauthorize_issuer(issuer: address) {
-        return then finalize(self.caller, issuer);
+    async transition deauthorize_issuer(issuer: address) -> Future {
+        return finalize_deauthorize_issuer(self.caller, issuer);
     }
 
-    finalize deauthorize_issuer(caller: address, issuer: address) {
+    async function finalize_deauthorize_issuer(caller: address, issuer: address) {
         let admin_addr: address = Mapping::get(admin, 0u8);
         assert_eq(caller, admin_addr);
         Mapping::set(authorized_issuers, issuer, false);
@@ -239,7 +247,7 @@ program credential.aleo {
 
     // Issue a credential to a user
     // Only authorized issuers can call this (enforced in finalize)
-    transition issue_credential(
+    async transition issue_credential(
         recipient: address,
         subject_commitment: field,
         credential_type: u8,
@@ -253,7 +261,7 @@ program credential.aleo {
         issuance_salt: field,
         revocation_secret: field,
         proof_salt: field
-    ) -> Credential {
+    ) -> (Credential, Future) {
         // Build claims struct
         let claims: ClaimData = ClaimData {
             age: age,
@@ -302,10 +310,10 @@ program credential.aleo {
             proof_salt: proof_salt,
         };
 
-        return credential then finalize(self.caller, issuance_nonce);
+        return (credential, finalize_issue_credential(self.caller, issuance_nonce));
     }
 
-    finalize issue_credential(issuer: address, issuance_nonce: field) {
+    async function finalize_issue_credential(issuer: address, issuance_nonce: field) {
         // Verify issuer is authorized
         let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
         assert(is_authorized);
@@ -324,19 +332,19 @@ program credential.aleo {
 
     // Revoke a credential using credential_id and revocation_secret
     // Only the original issuer (who knows the secret) can revoke
-    transition revoke_credential(
+    async transition revoke_credential(
         credential_id: field,
         revocation_secret: field
-    ) {
+    ) -> Future {
         let nullifier: field = compute_revocation_nullifier(
             credential_id,
             revocation_secret
         );
 
-        return then finalize(self.caller, nullifier);
+        return finalize_revoke_credential(self.caller, nullifier);
     }
 
-    finalize revoke_credential(issuer: address, nullifier: field) {
+    async function finalize_revoke_credential(issuer: address, nullifier: field) {
         // Verify caller is an authorized issuer
         let is_authorized: bool = Mapping::get_or_use(authorized_issuers, issuer, false);
         assert(is_authorized);
@@ -367,13 +375,13 @@ program credential.aleo {
     // - minimum_age is public (the threshold being checked)
     // - credential.age is NEVER revealed
     // - Output is only boolean (pass/fail)
-    transition prove_age_minimum(
+    async transition prove_age_minimum(
         credential: Credential,
         minimum_age: u8,
         current_block: u64,
         verifier_context: field,
         user_seed: field
-    ) -> (Credential, CredentialProof) {
+    ) -> (Credential, CredProof, Future) {
         // ═══ ZK CONSTRAINT 1: Ownership ═══
         // The record system enforces this, but we assert explicitly
         // This constraint is compiled into the ZK circuit
@@ -408,7 +416,7 @@ program credential.aleo {
         );
 
         // Create proof record
-        let proof: CredentialProof = CredentialProof {
+        let proof: CredProof = CredProof {
             owner: self.caller,
             claim_hash: claim_hash,
             claim_type: TYPE_AGE,
@@ -438,10 +446,10 @@ program credential.aleo {
         };
 
         // Check revocation in finalize
-        return (preserved, proof) then finalize(credential.revocation_nullifier);
+        return (preserved, proof, finalize_prove_age_minimum(credential.revocation_nullifier));
     }
 
-    finalize prove_age_minimum(revocation_nullifier: field) {
+    async function finalize_prove_age_minimum(revocation_nullifier: field) {
         // Check credential is not revoked
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
@@ -457,12 +465,12 @@ program credential.aleo {
     // 2. credential.kyc_passed == true
     // 3. not expired
     // 4. not revoked (finalize)
-    transition prove_kyc_status(
+    async transition prove_kyc_status(
         credential: Credential,
         current_block: u64,
         verifier_context: field,
         user_seed: field
-    ) -> (Credential, CredentialProof) {
+    ) -> (Credential, CredProof, Future) {
         // ═══ ZK CONSTRAINT 1: Ownership ═══
         assert_eq(credential.owner, self.caller);
 
@@ -490,7 +498,7 @@ program credential.aleo {
             proof_nonce
         );
 
-        let proof: CredentialProof = CredentialProof {
+        let proof: CredProof = CredProof {
             owner: self.caller,
             claim_hash: claim_hash,
             claim_type: TYPE_KYC,
@@ -518,10 +526,10 @@ program credential.aleo {
             proof_salt: credential.proof_salt,
         };
 
-        return (preserved, proof) then finalize(credential.revocation_nullifier);
+        return (preserved, proof, finalize_prove_kyc_status(credential.revocation_nullifier));
     }
 
-    finalize prove_kyc_status(revocation_nullifier: field) {
+    async function finalize_prove_kyc_status(revocation_nullifier: field) {
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
@@ -543,7 +551,7 @@ program credential.aleo {
     //
     // NOTE: We check against 4 restricted countries. For more, extend the list
     // or use multiple proof calls.
-    transition prove_country_not_restricted(
+    async transition prove_country_not_restricted(
         credential: Credential,
         restricted_1: u16,
         restricted_2: u16,
@@ -552,7 +560,7 @@ program credential.aleo {
         current_block: u64,
         verifier_context: field,
         user_seed: field
-    ) -> (Credential, CredentialProof) {
+    ) -> (Credential, CredProof, Future) {
         // ═══ ZK CONSTRAINT 1: Ownership ═══
         assert_eq(credential.owner, self.caller);
 
@@ -593,7 +601,7 @@ program credential.aleo {
             1field + proof_nonce + restriction_hash
         );
 
-        let proof: CredentialProof = CredentialProof {
+        let proof: CredProof = CredProof {
             owner: self.caller,
             claim_hash: claim_hash,
             claim_type: TYPE_JURISDICTION,
@@ -621,10 +629,10 @@ program credential.aleo {
             proof_salt: credential.proof_salt,
         };
 
-        return (preserved, proof) then finalize(credential.revocation_nullifier);
+        return (preserved, proof, fin_prove_country(credential.revocation_nullifier));
     }
 
-    finalize prove_country_not_restricted(revocation_nullifier: field) {
+    async function fin_prove_country(revocation_nullifier: field) {
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
@@ -632,12 +640,12 @@ program credential.aleo {
     // ───────────────────────────────────────────────────────────────────────────
     // PROVE ACCREDITED INVESTOR
     // ───────────────────────────────────────────────────────────────────────────
-    transition prove_accredited_investor(
+    async transition prove_accredited_investor(
         credential: Credential,
         current_block: u64,
         verifier_context: field,
         user_seed: field
-    ) -> (Credential, CredentialProof) {
+    ) -> (Credential, CredProof, Future) {
         assert_eq(credential.owner, self.caller);
         assert(credential.accredited_investor);
 
@@ -659,7 +667,7 @@ program credential.aleo {
             proof_nonce
         );
 
-        let proof: CredentialProof = CredentialProof {
+        let proof: CredProof = CredProof {
             owner: self.caller,
             claim_hash: claim_hash,
             claim_type: TYPE_ACCREDITATION,
@@ -687,10 +695,10 @@ program credential.aleo {
             proof_salt: credential.proof_salt,
         };
 
-        return (preserved, proof) then finalize(credential.revocation_nullifier);
+        return (preserved, proof, fin_prove_accredited(credential.revocation_nullifier));
     }
 
-    finalize prove_accredited_investor(revocation_nullifier: field) {
+    async function fin_prove_accredited(revocation_nullifier: field) {
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
@@ -699,7 +707,7 @@ program credential.aleo {
     // PROVE COMPOSITE (AGE + KYC + COUNTRY)
     // ───────────────────────────────────────────────────────────────────────────
     // Proves multiple claims in a single proof for efficiency
-    transition prove_composite(
+    async transition prove_composite(
         credential: Credential,
         minimum_age: u8,
         restricted_1: u16,
@@ -709,7 +717,7 @@ program credential.aleo {
         current_block: u64,
         verifier_context: field,
         user_seed: field
-    ) -> (Credential, CredentialProof) {
+    ) -> (Credential, CredProof, Future) {
         // Ownership
         assert_eq(credential.owner, self.caller);
 
@@ -748,7 +756,7 @@ program credential.aleo {
             1field + proof_nonce + params_hash
         );
 
-        let proof: CredentialProof = CredentialProof {
+        let proof: CredProof = CredProof {
             owner: self.caller,
             claim_hash: claim_hash,
             claim_type: TYPE_COMPOSITE,
@@ -776,10 +784,10 @@ program credential.aleo {
             proof_salt: credential.proof_salt,
         };
 
-        return (preserved, proof) then finalize(credential.revocation_nullifier);
+        return (preserved, proof, finalize_prove_composite(credential.revocation_nullifier));
     }
 
-    finalize prove_composite(revocation_nullifier: field) {
+    async function finalize_prove_composite(revocation_nullifier: field) {
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }
@@ -789,9 +797,9 @@ program credential.aleo {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Check if credential is revoked (for user's own verification)
-    transition check_revocation(
+    async transition check_revocation(
         credential: Credential
-    ) -> (Credential, bool) {
+    ) -> (Credential, bool, Future) {
         assert_eq(credential.owner, self.caller);
 
         let preserved: Credential = Credential {
@@ -813,10 +821,10 @@ program credential.aleo {
 
         // The bool returned is a placeholder - real check happens in finalize
         // If finalize fails, credential is revoked
-        return (preserved, true) then finalize(credential.revocation_nullifier);
+        return (preserved, true, finalize_check_revocation(credential.revocation_nullifier));
     }
 
-    finalize check_revocation(revocation_nullifier: field) {
+    async function finalize_check_revocation(revocation_nullifier: field) {
         let is_revoked: bool = Mapping::get_or_use(revoked_nullifiers, revocation_nullifier, false);
         assert(!is_revoked);
     }

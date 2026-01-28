@@ -19,7 +19,15 @@
 // - No credential data is ever revealed to verifiers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-program verifier.aleo {
+program zkaccess_verif_v1.aleo {
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Required for deployment - immutable program (no upgrades)
+    @noupgrade
+    async constructor() {}
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -127,22 +135,22 @@ program verifier.aleo {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Initialize admin
-    transition initialize_admin(admin_address: address) {
-        return then finalize(admin_address);
+    async transition initialize_admin(admin_address: address) -> Future {
+        return finalize_initialize_admin(admin_address);
     }
 
-    finalize initialize_admin(admin_address: address) {
+    async function finalize_initialize_admin(admin_address: address) {
         let exists: bool = Mapping::contains(admin, 0u8);
         assert(!exists);
         Mapping::set(admin, 0u8, admin_address);
     }
 
     // Register a verifier
-    transition register_verifier(verifier: address) {
-        return then finalize(self.caller, verifier);
+    async transition register_verifier(verifier: address) -> Future {
+        return finalize_register_verifier(self.caller, verifier);
     }
 
-    finalize register_verifier(caller: address, verifier: address) {
+    async function finalize_register_verifier(caller: address, verifier: address) {
         let admin_addr: address = Mapping::get(admin, 0u8);
         assert_eq(caller, admin_addr);
         Mapping::set(registered_verifiers, verifier, true);
@@ -168,11 +176,11 @@ program verifier.aleo {
     // OUTPUT:
     // - VerificationResult record owned by caller
     // - Can be used as access gate in other protocols
-    transition verify_proof(
+    async transition verify_proof(
         proof: CredentialProof,
         expected_verifier_context: field,
         current_block: u64
-    ) -> VerificationResult {
+    ) -> (VerificationResult, Future) {
         // ═══ CHECK 1: Ownership ═══
         // Only the proof holder can present it
         assert_eq(proof.owner, self.caller);
@@ -215,10 +223,10 @@ program verifier.aleo {
         };
 
         // Mark proof as consumed in finalize
-        return result then finalize(proof.proof_nonce, self.caller);
+        return (result, finalize_verify_proof(proof.proof_nonce, self.caller));
     }
 
-    finalize verify_proof(proof_nonce: field, verifier: address) {
+    async function finalize_verify_proof(proof_nonce: field, verifier: address) {
         // Check proof hasn't been consumed
         let consumed: bool = Mapping::get_or_use(consumed_nonces, proof_nonce, false);
         assert(!consumed);
@@ -238,11 +246,11 @@ program verifier.aleo {
     // VERIFY AGE PROOF (Specialized)
     // ───────────────────────────────────────────────────────────────────────────
     // Verifies specifically an age proof
-    transition verify_age_proof(
+    async transition verify_age_proof(
         proof: CredentialProof,
         expected_verifier_context: field,
         current_block: u64
-    ) -> VerificationResult {
+    ) -> (VerificationResult, Future) {
         // Ownership
         assert_eq(proof.owner, self.caller);
 
@@ -280,10 +288,10 @@ program verifier.aleo {
             credential_expires_at: proof.expires_at,
         };
 
-        return result then finalize(proof.proof_nonce, self.caller);
+        return (result, finalize_verify_age_proof(proof.proof_nonce, self.caller));
     }
 
-    finalize verify_age_proof(proof_nonce: field, verifier: address) {
+    async function finalize_verify_age_proof(proof_nonce: field, verifier: address) {
         let consumed: bool = Mapping::get_or_use(consumed_nonces, proof_nonce, false);
         assert(!consumed);
         Mapping::set(consumed_nonces, proof_nonce, true);
@@ -298,11 +306,11 @@ program verifier.aleo {
     // ───────────────────────────────────────────────────────────────────────────
     // VERIFY KYC PROOF (Specialized)
     // ───────────────────────────────────────────────────────────────────────────
-    transition verify_kyc_proof(
+    async transition verify_kyc_proof(
         proof: CredentialProof,
         expected_verifier_context: field,
         current_block: u64
-    ) -> VerificationResult {
+    ) -> (VerificationResult, Future) {
         assert_eq(proof.owner, self.caller);
         assert_eq(proof.claim_type, TYPE_KYC);
         assert_eq(proof.verifier_context, expected_verifier_context);
@@ -332,10 +340,10 @@ program verifier.aleo {
             credential_expires_at: proof.expires_at,
         };
 
-        return result then finalize(proof.proof_nonce, self.caller);
+        return (result, finalize_verify_kyc_proof(proof.proof_nonce, self.caller));
     }
 
-    finalize verify_kyc_proof(proof_nonce: field, verifier: address) {
+    async function finalize_verify_kyc_proof(proof_nonce: field, verifier: address) {
         let consumed: bool = Mapping::get_or_use(consumed_nonces, proof_nonce, false);
         assert(!consumed);
         Mapping::set(consumed_nonces, proof_nonce, true);
@@ -350,11 +358,11 @@ program verifier.aleo {
     // ───────────────────────────────────────────────────────────────────────────
     // VERIFY COMPOSITE PROOF
     // ───────────────────────────────────────────────────────────────────────────
-    transition verify_composite_proof(
+    async transition verify_composite_proof(
         proof: CredentialProof,
         expected_verifier_context: field,
         current_block: u64
-    ) -> VerificationResult {
+    ) -> (VerificationResult, Future) {
         assert_eq(proof.owner, self.caller);
         assert_eq(proof.claim_type, TYPE_COMPOSITE);
         assert_eq(proof.verifier_context, expected_verifier_context);
@@ -384,10 +392,10 @@ program verifier.aleo {
             credential_expires_at: proof.expires_at,
         };
 
-        return result then finalize(proof.proof_nonce, self.caller);
+        return (result, fin_verify_composite(proof.proof_nonce, self.caller));
     }
 
-    finalize verify_composite_proof(proof_nonce: field, verifier: address) {
+    async function fin_verify_composite(proof_nonce: field, verifier: address) {
         let consumed: bool = Mapping::get_or_use(consumed_nonces, proof_nonce, false);
         assert(!consumed);
         Mapping::set(consumed_nonces, proof_nonce, true);
@@ -408,12 +416,12 @@ program verifier.aleo {
     // ───────────────────────────────────────────────────────────────────────────
     // Used by protocols to consume a verification result.
     // After consumption, the result cannot be reused.
-    transition consume_verification(
+    async transition consume_verification(
         result: VerificationResult,
         expected_claim_type: u8,
         expected_verifier_context: field,
         current_block: u64
-    ) -> bool {
+    ) -> (bool, Future) {
         // Ownership
         assert_eq(result.owner, self.caller);
 
@@ -432,10 +440,10 @@ program verifier.aleo {
         assert(still_valid);
 
         // Mark as consumed in finalize
-        return true then finalize(result.verification_id);
+        return (true, fin_consume_verification(result.verification_id));
     }
 
-    finalize consume_verification(verification_id: field) {
+    async function fin_consume_verification(verification_id: field) {
         // Check not already consumed
         let consumed: bool = Mapping::get_or_use(consumed_verifications, verification_id, false);
         assert(!consumed);

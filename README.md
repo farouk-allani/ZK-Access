@@ -131,6 +131,23 @@ aleo-zk/
 
 ---
 
+## Testnet Deployment
+
+All programs have been deployed to Aleo Testnet.
+
+| Program | Program ID | Transaction ID |
+|---------|------------|----------------|
+| **Identity** | `zkaccess_id_v1.aleo` | [`at1upv50wart4lal3sqwf7qyvjwk0lf4l7l40wpjjg2vze0schkx59s9lgj7f`](https://testnet.aleo.info/transaction/at1upv50wart4lal3sqwf7qyvjwk0lf4l7l40wpjjg2vze0schkx59s9lgj7f) |
+| **Credential** | `zkaccess_cred_v1.aleo` | [`at1rc0xjgyx7camstj9lglnn9jkgnrxgvye7sljfhreuf5qc0uhsqps85dfrf`](https://testnet.aleo.info/transaction/at1rc0xjgyx7camstj9lglnn9jkgnrxgvye7sljfhreuf5qc0uhsqps85dfrf) |
+| **Verifier** | `zkaccess_verif_v1.aleo` | [`at1qkxkadfp3cwkaqmrnzx6y05j8rfk6n6gntkey3202v4x8xphcyxq9h5unn`](https://testnet.aleo.info/transaction/at1qkxkadfp3cwkaqmrnzx6y05j8rfk6n6gntkey3202v4x8xphcyxq9h5unn) |
+
+**Deployment Details:**
+- Network: Aleo Testnet
+- Consensus Version: 12
+- Deployer: `aleo15ac90dsv2cayepmctwtqg0qugag3myahx8nt7tnq9s3kpmu0l5xsdcz3lv`
+
+---
+
 ## Security Properties
 
 | Property | Mechanism | Guarantee |

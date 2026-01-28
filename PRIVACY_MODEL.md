@@ -348,3 +348,164 @@ ZK-Access provides the following formal guarantees:
 5. **Selective Disclosure**: Proofs reveal only the proven claim, nothing else
 
 These guarantees hold under standard cryptographic assumptions (discrete log hardness, hash collision resistance) and assuming Aleo's zkSNARK system is sound.
+
+---
+
+## 8. Auditor Reference: ZK Circuit Analysis
+
+This section provides formal analysis of each ZK proof for security auditors.
+
+### 8.1 prove_age_minimum Circuit
+
+**File**: `credential/src/main.leo:370-448`
+
+**Existential Statement**:
+```
+∃ credential such that:
+  1. credential.owner == self.caller
+  2. credential.age >= minimum_age
+  3. credential.expires_at == 0 ∨ current_block < credential.expires_at
+  4. revoked_nullifiers[credential.revocation_nullifier] == false
+```
+
+**Private Inputs** (witness):
+| Input | Type | Source |
+|-------|------|--------|
+| `credential` | Record | User's encrypted credential |
+| All credential fields | Various | Decrypted from record |
+
+**Public Inputs**:
+| Input | Type | Source |
+|-------|------|--------|
+| `minimum_age` | u8 | Caller parameter |
+| `current_block` | u64 | Caller parameter |
+| `verifier_context` | field | Caller parameter |
+
+**Leakage Surface**:
+```
+Information revealed: age ∈ [minimum_age, 255]
+Information NOT revealed: exact age value
+Leakage = 0 bits beyond boolean result
+```
+
+**Constraint Locations**:
+- Line 380: `assert_eq(credential.owner, self.caller)`
+- Line 386: `assert(credential.age >= minimum_age)` ← Core ZK proof
+- Line 392: `assert(not_expired)`
+
+### 8.2 prove_kyc_status Circuit
+
+**File**: `credential/src/main.leo:460-527`
+
+**Existential Statement**:
+```
+∃ credential such that:
+  1. credential.owner == self.caller
+  2. credential.kyc_passed == true
+  3. not expired
+  4. not revoked
+```
+
+**Leakage Surface**:
+```
+Information revealed: kyc_passed == true
+Information NOT revealed: any other credential field
+Leakage = 1 bit (boolean KYC status)
+```
+
+**Constraint Location**:
+- Line 470: `assert(credential.kyc_passed)` ← Core ZK proof
+
+### 8.3 prove_country_not_restricted Circuit
+
+**File**: `credential/src/main.leo:546-630`
+
+**Existential Statement**:
+```
+∃ credential such that:
+  1. credential.owner == self.caller
+  2. credential.country_code ≠ restricted_1
+  3. credential.country_code ≠ restricted_2
+  4. credential.country_code ≠ restricted_3
+  5. credential.country_code ≠ restricted_4
+  6. not expired
+  7. not revoked
+```
+
+**Leakage Surface**:
+```
+Information revealed: country_code ∈ {0..65535} \ {restricted_1..4}
+Information NOT revealed: exact country code
+Leakage = log2(65532/65536) ≈ 0 bits (negligible)
+```
+
+**Constraint Locations**:
+- Lines 567-570: Four `assert(not_restricted_N)` ← Core ZK proofs
+
+### 8.4 Nullifier Security Analysis
+
+**Identity Nullifier**:
+```
+nullifier = BHP256(identity_commitment + nullifier_secret)
+```
+
+**Properties**:
+- Preimage resistance: Cannot find (commitment, secret) from nullifier
+- Collision resistance: Cannot find two inputs with same nullifier
+- Unlinkability: Observer cannot link nullifier to identity
+
+**Revocation Nullifier**:
+```
+revocation_nullifier = BHP256(credential_id + revocation_secret)
+```
+
+**Properties**:
+- Only issuer knows `revocation_secret`
+- User has `revocation_nullifier` in their credential (encrypted)
+- Revocation reveals nullifier, not credential or user
+
+### 8.5 Ownership Enforcement Analysis
+
+**Two-Layer Protection**:
+
+1. **Aleo Runtime Layer** (implicit):
+   - Records can only be spent by owner
+   - Enforced by private key / viewing key derivation
+
+2. **Circuit Layer** (explicit):
+   - `assert_eq(credential.owner, self.caller)`
+   - Compiled into ZK circuit as constraint
+
+**Why Both Layers**:
+- Runtime: Fundamental UTXO security
+- Circuit: Defense-in-depth, catches logic errors
+
+### 8.6 Replay Prevention Analysis
+
+| Vector | Mechanism | Strength |
+|--------|-----------|----------|
+| Identity cloning | `identity_nullifiers` mapping | One-time registration |
+| Binding replay | `used_binding_nonces` mapping | Nonce consumed |
+| Credential replay | `issuer_nonces` mapping | Nonce consumed |
+| Proof replay | `consumed_nonces` mapping | Nonce consumed per verifier |
+| Result replay | `consumed_verifications` mapping | ID consumed |
+
+### 8.7 What Auditors Should Verify
+
+1. **Assert statements in prove_* functions**: Ensure they enforce the claimed predicate
+2. **Finalize blocks**: Ensure they check authorization and revocation
+3. **Nullifier computation**: Ensure it includes a secret component
+4. **Nonce registration**: Ensure all nonces are tracked before use
+5. **Record preservation**: Ensure credentials are returned (not consumed permanently)
+
+### 8.8 Code References for Verification
+
+| Security Property | File | Lines | Code Pattern |
+|-------------------|------|-------|--------------|
+| Age proof | credential.aleo | 386 | `assert(credential.age >= minimum_age)` |
+| KYC proof | credential.aleo | 470 | `assert(credential.kyc_passed)` |
+| Country proof | credential.aleo | 567-570 | `assert(not_restricted_N)` |
+| Ownership | credential.aleo | 380,467,557,641,714 | `assert_eq(credential.owner, self.caller)` |
+| Revocation | credential.aleo | 444-448 | `assert(!is_revoked)` |
+| Issuer auth | credential.aleo | 309-311 | `assert(is_authorized)` |
+| Nonce consumption | verifier.aleo | 223-227 | `Mapping::set(consumed_nonces, ...)` |

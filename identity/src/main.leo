@@ -13,7 +13,15 @@
 // - No identity data is ever visible on-chain
 // ═══════════════════════════════════════════════════════════════════════════════
 
-program identity.aleo {
+program zkaccess_id_v1.aleo {
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // Required for deployment - immutable program (no upgrades)
+    @noupgrade
+    async constructor() {}
 
     // ═══════════════════════════════════════════════════════════════════════════
     // RECORD DEFINITIONS
@@ -50,7 +58,7 @@ program identity.aleo {
 
     // Binding token for cross-program identity attestation
     // Used to prove identity ownership to credential issuers
-    record IdentityBinding {
+    record IdBinding {
         owner: address,
         // The commitment that identifies this identity
         identity_commitment: field,
@@ -133,14 +141,14 @@ program identity.aleo {
     // PRIVACY:
     // - All inputs are private (encrypted in ZK proof)
     // - Only the nullifier is revealed (cannot be linked to identity)
-    transition create_identity(
+    async transition create_identity(
         unique_id_hash: field,
         attributes_hash: field,
         timestamp: u64,
         salt: field,
         nullifier_secret: field,
         data_hash: field
-    ) -> Identity {
+    ) -> (Identity, Future) {
         // Construct input for commitment
         let input: IdentityInput = IdentityInput {
             unique_id_hash: unique_id_hash,
@@ -165,10 +173,10 @@ program identity.aleo {
         };
 
         // Register nullifier in finalize (on-chain)
-        return identity then finalize(nullifier);
+        return (identity, finalize_create_identity(nullifier));
     }
 
-    finalize create_identity(nullifier: field) {
+    async function finalize_create_identity(nullifier: field) {
         // Check nullifier hasn't been used (prevents identity cloning)
         let exists: bool = Mapping::contains(identity_nullifiers, nullifier);
         assert(!exists);
@@ -227,12 +235,12 @@ program identity.aleo {
     // - Nonce prevents replay attacks
     // - Context binding prevents misuse across different purposes
     // - Expiry prevents stale bindings from being accepted
-    transition create_binding(
+    async transition create_binding(
         identity: Identity,
         binding_context: field,
         nonce_seed: field,
         expires_at: u64
-    ) -> (Identity, IdentityBinding) {
+    ) -> (Identity, IdBinding, Future) {
         // Verify ownership
         assert_eq(identity.owner, self.caller);
 
@@ -244,7 +252,7 @@ program identity.aleo {
         );
 
         // Create binding token
-        let binding: IdentityBinding = IdentityBinding {
+        let binding: IdBinding = IdBinding {
             owner: self.caller,
             identity_commitment: identity.identity_commitment,
             binding_context: binding_context,
@@ -262,10 +270,10 @@ program identity.aleo {
             nullifier_secret: identity.nullifier_secret,
         };
 
-        return (preserved, binding) then finalize(nonce);
+        return (preserved, binding, finalize_create_binding(nonce));
     }
 
-    finalize create_binding(nonce: field) {
+    async function finalize_create_binding(nonce: field) {
         // Ensure nonce hasn't been used
         let used: bool = Mapping::contains(used_binding_nonces, nonce);
         assert(!used);
@@ -281,7 +289,7 @@ program identity.aleo {
     // Returns true if the binding's commitment matches the identity's commitment.
     transition verify_binding(
         identity: Identity,
-        binding: IdentityBinding
+        binding: IdBinding
     ) -> (Identity, bool) {
         // Verify ownership of both
         assert_eq(identity.owner, self.caller);
