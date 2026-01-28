@@ -163,7 +163,7 @@ All programs have been deployed to Aleo Testnet.
 
 ## Compliance Summary
 
-### Wave 1: Private Identity Core ✓
+### Private Identity Core ✓
 
 | Requirement | Implementation |
 |-------------|----------------|
@@ -174,7 +174,7 @@ All programs have been deployed to Aleo Testnet.
 | Create/read/update | ✅ All transitions implemented |
 | No public identity data | ✅ Only nullifiers in mappings |
 
-### Wave 2: Private Credentials ✓
+### Private Credentials ✓
 
 | Requirement | Implementation |
 |-------------|----------------|
