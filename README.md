@@ -183,7 +183,7 @@ All programs have been deployed to Aleo Testnet.
 | Encrypted credentials | ✅ 15-field credential record |
 | Identity binding | ✅ `subject_commitment` from identity |
 | Claims (age, country, kyc) | ✅ All implemented with ZK constraints |
-| Real ZK proofs | ✅ Circuit constraints, not stubs |
+| Real ZK proofs | ✅ Circuit constraints |
 | Revocation | ✅ Nullifier-based, unlinkable |
 | Verifier program | ✅ Composable verification |
 
@@ -223,4 +223,4 @@ MIT
 
 ---
 
-**Built for Aleo Mainnet** | Cryptographically Sound | Production Ready
+**Built for Aleo Buildathon** | Cryptographically Sound | Production Ready
