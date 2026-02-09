@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #FFFBF0;
+  --color-ink: #1a1a2e;
+  --color-coral: #FF6B6B;
+  --color-purple: #A855F7;
+  --color-lime: #84CC16;
+  --color-amber: #FBBF24;
+  --color-sky: #60A5FA;
+  --color-pink: #F472B6;
+  --color-mint: #34D399;
+
+  --font-heading: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* ===== NEO-BRUTALISM DESIGN SYSTEM ===== */
+
+.brut-card {
+  border-radius: 1.5rem;
+  border: 3px solid var(--color-ink);
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.brut-card:hover {
+  box-shadow: 8px 8px 0 0 var(--color-ink);
+  transform: translate(-2px, -2px);
+}
+
+.brut-card-static {
+  border-radius: 1.5rem;
+  border: 3px solid var(--color-ink);
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+}
+
+.brut-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  border: 3px solid var(--color-ink);
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  color: var(--color-ink);
+}
+
+.brut-btn:hover {
+  box-shadow: 2px 2px 0 0 var(--color-ink);
+  transform: translate(2px, 2px);
+}
+
+.brut-btn:active {
+  box-shadow: 0 0 0 0 var(--color-ink);
+  transform: translate(4px, 4px);
+}
+
+.brut-btn-lg {
+  font-size: 1.125rem;
+  padding: 1rem 2rem;
+  border-radius: 1.25rem;
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+}
+
+.brut-btn-lg:hover {
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+  transform: translate(3px, 3px);
+}
+
+.brut-input {
+  border-radius: 1rem;
+  border: 3px solid var(--color-ink);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-family: var(--font-body);
+  outline: none;
+  background: white;
+  color: var(--color-ink);
+  transition: box-shadow 0.15s ease;
+  width: 100%;
+}
+
+.brut-input:focus {
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+}
+
+.brut-input::placeholder {
+  color: #9ca3af;
+}
+
+.brut-select {
+  border-radius: 1rem;
+  border: 3px solid var(--color-ink);
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-family: var(--font-body);
+  outline: none;
+  background: white;
+  color: var(--color-ink);
+  cursor: pointer;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231a1a2e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.25rem;
+  padding-right: 2.5rem;
+}
+
+.brut-select:focus {
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+}
+
+.brut-toggle {
+  position: relative;
+  width: 3.5rem;
+  height: 2rem;
+  border-radius: 1rem;
+  border: 3px solid var(--color-ink);
+  background: #e5e7eb;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.brut-toggle.active {
+  background: var(--color-lime);
+}
+
+.brut-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--color-ink);
+  transition: transform 0.2s ease;
+}
+
+.brut-toggle.active::after {
+  transform: translateX(1.4rem);
+}
+
+.brut-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.75rem;
+  border: 2px solid var(--color-ink);
+  padding: 0.25rem 0.75rem;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+/* Toast notification */
+.brut-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 1000;
+  border-radius: 1rem;
+  border: 3px solid var(--color-ink);
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+  padding: 1rem 1.5rem;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  animation: toast-in 0.3s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-shadow {
+  0%, 100% {
+    box-shadow: 6px 6px 0 0 var(--color-ink);
+  }
+  50% {
+    box-shadow: 3px 3px 0 0 var(--color-ink);
+  }
+}
+
+.brut-pulse {
+  animation: pulse-shadow 1.5s ease-in-out infinite;
+}
+
+/* Marquee for hero */
+@keyframes scroll-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: scroll-left 30s linear infinite;
+}
+
+/* Page transition */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: page-in 0.35s ease-out;
+}
