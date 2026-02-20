@@ -41,35 +41,8 @@ Every action is a real Aleo transaction. No mocks, no simulations.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      USER (Browser)                      │
-│                                                          │
-│  ┌──────────────┐   ┌───────────────────────────────┐   │
-│  │ Shield Wallet │   │  React Frontend               │   │
-│  │ (Leo Wallet)  │◄──│  • Issue page                 │   │
-│  │               │   │  • Credentials page            │   │
-│  │ Signs txs     │──►│  • Prove page                 │   │
-│  │ Stores records│   │  • Verify page (Activity)     │   │
-│  └──────────────┘   └───────────────────────────────┘   │
-│         │                          │                     │
-│         │   @provablehq/aleo-wallet-adaptor-react        │
-└─────────┼──────────────────────────┼─────────────────────┘
-          │                          │
-          ▼                          ▼
-┌─────────────────────────────────────────────────────────┐
-│                   ALEO TESTNET                           │
-│                                                          │
-│  zkaccess_v2.aleo                                        │
-│  ├── issue_credential(recipient, age, country, ...)      │
-│  ├── prove_age(credential, min_age) → (Credential, Proof)│
-│  ├── prove_kyc(credential) → (Credential, Proof)         │
-│  ├── prove_country(credential) → (Credential, Proof)     │
-│  └── prove_accredited(credential) → (Credential, Proof)  │
-│                                                          │
-│  All records encrypted. All execution local.             │
-└─────────────────────────────────────────────────────────┘
-```
+<img width="600"  alt="zk-access schema" src="https://github.com/user-attachments/assets/2c36e7db-9072-4e63-a54d-0625c1274b45" />
+
 
 ---
 
