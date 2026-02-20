@@ -50,13 +50,16 @@ export default function Verify() {
           {transactions.map(tx => {
             const meta = FN_LABELS[tx.functionName] || { label: tx.functionName, color: '#e5e7eb', icon: FileCheck }
             const Icon = meta.icon
+            const href = tx.explorerId ? `https://testnet.aleoscan.io/transaction?id=${tx.explorerId}` : undefined
             return (
               <a
                 key={tx.id}
-                href={`https://testnet.aleoscan.io/transaction?id=${tx.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={href}
+                target={href ? '_blank' : undefined}
+                rel={href ? 'noopener noreferrer' : undefined}
                 className="brut-card bg-white overflow-hidden no-underline block"
+                onClick={href ? undefined : (e) => e.preventDefault()}
+                style={{ opacity: href ? 1 : 0.85, cursor: href ? 'pointer' : 'default' }}
               >
                 <div className="flex items-center gap-4 p-5">
                   <div
@@ -82,8 +85,13 @@ export default function Verify() {
                       <span className="text-xs" style={{ color: '#9ca3af' }}>
                         {new Date(tx.timestamp).toLocaleString()}
                       </span>
-                      <ExternalLink size={10} style={{ color: '#9ca3af', marginLeft: '0.25rem' }} />
+                      {href && <ExternalLink size={10} style={{ color: '#9ca3af', marginLeft: '0.25rem' }} />}
                     </div>
+                    {!href && (
+                      <p className="text-[11px] mt-1" style={{ color: '#9ca3af' }}>
+                        Wallet request ID (AleoScan link unavailable)
+                      </p>
+                    )}
                   </div>
                 </div>
               </a>

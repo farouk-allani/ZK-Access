@@ -9,6 +9,7 @@ export default function Issue() {
   const { connected, address, executeTransition } = useWallet()
   const [loading, setLoading] = useState(false)
   const [txId, setTxId] = useState<string | null>(null)
+  const [explorerTxId, setExplorerTxId] = useState<string | null>(null)
   const [form, setForm] = useState({
     owner: '',
     age: 25,
@@ -23,6 +24,7 @@ export default function Issue() {
 
     setLoading(true)
     setTxId(null)
+    setExplorerTxId(null)
 
     const recipient = form.owner || address
     const inputs = [
@@ -34,7 +36,8 @@ export default function Issue() {
     ]
 
     const result = await executeTransition('issue_credential', inputs)
-    setTxId(result)
+    setTxId(result?.id ?? null)
+    setExplorerTxId(result?.explorerId ?? null)
     setLoading(false)
   }
 
@@ -72,15 +75,21 @@ export default function Issue() {
             Your credential transaction has been submitted to the Aleo network.
             The credential record will appear in your wallet once confirmed.
           </p>
-          <a
-            href={`https://testnet.aleoscan.io/transaction?id=${txId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="brut-btn mb-6 inline-flex"
-            style={{ background: 'white', fontSize: '0.85rem' }}
-          >
-            View on AleoScan <ExternalLink size={14} />
-          </a>
+          {explorerTxId ? (
+            <a
+              href={`https://testnet.aleoscan.io/transaction?id=${explorerTxId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="brut-btn mb-6 inline-flex"
+              style={{ background: 'white', fontSize: '0.85rem' }}
+            >
+              View on AleoScan <ExternalLink size={14} />
+            </a>
+          ) : (
+            <p className="text-xs mb-6" style={{ opacity: 0.7 }}>
+              On-chain transaction ID is not available from wallet response yet.
+            </p>
+          )}
           <p className="text-xs font-mono mb-6" style={{ opacity: 0.5, wordBreak: 'break-all' }}>
             TX: {txId}
           </p>
