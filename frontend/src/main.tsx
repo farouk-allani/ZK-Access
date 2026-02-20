@@ -18,8 +18,6 @@ function Root() {
       wallets={wallets}
       decryptPermission={DecryptPermission.UponRequest}
       network={Network.TESTNET}
-      programs={['zkaccess_v2.aleo']}
-      autoConnect
     >
       <WalletModalProvider network={Network.TESTNET}>
         <BrowserRouter>
