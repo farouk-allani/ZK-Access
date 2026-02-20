@@ -9,6 +9,7 @@ export interface TxRecord {
   functionName: string
   timestamp: number
   status: 'submitted' | 'confirmed' | 'failed'
+  explorerId?: string
 }
 
 export type ProofType = 'age' | 'kyc' | 'country' | 'accredited'

@@ -171,20 +171,10 @@ export default function Prove() {
   const [minimumAge, setMinimumAge] = useState(18)
   const [loading, setLoading] = useState(false)
   const [txId, setTxId] = useState<string | null>(null)
+  const [explorerTxId, setExplorerTxId] = useState<string | null>(null)
   const [records, setRecords] = useState<Record<string, unknown>[]>([])
   const [selectedRecord, setSelectedRecord] = useState<number>(-1)
   const [fetchingRecords, setFetchingRecords] = useState(false)
-
-  const selectedRecordRaw = selectedRecord >= 0 ? records[selectedRecord] : null
-  const selectedRecordInputDebug = selectedRecordRaw ? toRecordInput(selectedRecordRaw) : null
-  const selectedRecordDebug = (() => {
-    if (!selectedRecordRaw) return null
-    try {
-      return JSON.stringify(selectedRecordRaw, null, 2)
-    } catch {
-      return String(selectedRecordRaw)
-    }
-  })()
 
   const fetchRecords = async () => {
     setFetchingRecords(true)
@@ -213,6 +203,7 @@ export default function Prove() {
 
     setLoading(true)
     setTxId(null)
+    setExplorerTxId(null)
 
     const record = records[selectedRecord]
     const proofConfig = PROOF_TYPES.find(p => p.value === proofType)!
@@ -231,7 +222,8 @@ export default function Prove() {
     }
 
     const result = await executeTransition(proofConfig.fn, inputs)
-    setTxId(result)
+    setTxId(result?.id ?? null)
+    setExplorerTxId(result?.explorerId ?? null)
     setLoading(false)
   }
 
@@ -261,15 +253,21 @@ export default function Prove() {
               Your proof transaction has been submitted to the Aleo network.
               The credential has been consumed and a new instance returned to your wallet.
             </p>
-            <a
-              href={`https://testnet.aleoscan.io/transaction?id=${txId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="brut-btn mb-4 inline-flex"
-              style={{ background: 'white', fontSize: '0.85rem' }}
-            >
-              View on AleoScan <ExternalLink size={14} />
-            </a>
+            {explorerTxId ? (
+              <a
+                href={`https://testnet.aleoscan.io/transaction?id=${explorerTxId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="brut-btn mb-4 inline-flex"
+                style={{ background: 'white', fontSize: '0.85rem' }}
+              >
+                View on AleoScan <ExternalLink size={14} />
+              </a>
+            ) : (
+              <p className="text-xs mb-4" style={{ opacity: 0.7 }}>
+                On-chain transaction ID is not available from wallet response yet.
+              </p>
+            )}
             <p className="text-xs font-mono mb-6" style={{ opacity: 0.5, wordBreak: 'break-all' }}>
               TX: {txId}
             </p>

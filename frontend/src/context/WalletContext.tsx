@@ -5,6 +5,45 @@ import type { Toast, TxRecord } from '../types'
 export const PROGRAM_ID = 'zkaccess_v2.aleo'
 const DEFAULT_FEE = 100_000
 
+function isAleoExplorerTxId(value: string): boolean {
+  return /^at1[a-z0-9]+$/i.test(value)
+}
+
+function pickTransactionIds(result: unknown): { id: string; explorerId: string | null } {
+  if (typeof result === 'string') {
+    const trimmed = result.trim()
+    if (!trimmed) return { id: '', explorerId: null }
+    return {
+      id: trimmed,
+      explorerId: isAleoExplorerTxId(trimmed) ? trimmed : null,
+    }
+  }
+
+  if (!result || typeof result !== 'object') {
+    return { id: '', explorerId: null }
+  }
+
+  const source = result as Record<string, unknown>
+  const candidateKeys = [
+    'transactionId',
+    'id',
+    'txId',
+    'transaction_id',
+    'transactionHash',
+    'hash',
+    'onChainTransactionId',
+  ]
+
+  const candidates = candidateKeys
+    .map(key => source[key])
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map(value => value.trim())
+
+  const explorerId = candidates.find(isAleoExplorerTxId) ?? null
+  const id = explorerId ?? candidates[0] ?? ''
+  return { id, explorerId }
+}
+
 function extractRecordInput(record: unknown): string | null {
   if (typeof record === 'string') {
     const trimmed = record.trim()
@@ -100,7 +139,7 @@ export function useWallet() {
     functionName: string,
     inputs: string[],
     fee = DEFAULT_FEE,
-  ): Promise<string | null> => {
+  ): Promise<{ id: string; explorerId: string | null } | null> => {
     if (!adapter.connected) {
       app.addToast('Wallet not connected', 'error')
       return null
@@ -114,17 +153,18 @@ export function useWallet() {
         fee,
       })
 
-      const txId = result?.transactionId || ''
+      const tx = pickTransactionIds(result)
 
       app.addTransaction({
-        id: txId,
+        id: tx.id,
+        explorerId: tx.explorerId ?? undefined,
         functionName,
         timestamp: Date.now(),
         status: 'submitted',
       })
 
       app.addToast('Transaction submitted!', 'success')
-      return txId
+      return tx
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Transaction failed'
       app.addToast(msg, 'error')
