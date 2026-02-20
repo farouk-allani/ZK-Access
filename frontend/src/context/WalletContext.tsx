@@ -5,6 +5,35 @@ import type { Toast, TxRecord } from '../types'
 export const PROGRAM_ID = 'zkaccess_v2.aleo'
 const DEFAULT_FEE = 100_000
 
+function extractRecordInput(record: unknown): string | null {
+  if (typeof record === 'string') {
+    const trimmed = record.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (!record || typeof record !== 'object') {
+    return null
+  }
+
+  const source = record as Record<string, unknown>
+  const candidates = [
+    source.record,
+    source.ciphertext,
+    source.cipher_text,
+    source.plaintext,
+    source.value,
+    source.raw,
+  ]
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
@@ -105,12 +134,59 @@ export function useWallet() {
 
   const getRecords = useCallback(async (): Promise<Record<string, unknown>[]> => {
     if (!adapter.connected) return []
+    let plaintextRecords: unknown[] = []
+    let spendableRecords: unknown[] = []
+
     try {
-      const records = await adapter.requestRecords(PROGRAM_ID)
-      return records as Record<string, unknown>[]
+      plaintextRecords = await adapter.requestRecords(PROGRAM_ID, true)
     } catch {
+      plaintextRecords = []
+    }
+
+    try {
+      spendableRecords = await adapter.requestRecords(PROGRAM_ID, false)
+    } catch {
+      spendableRecords = []
+    }
+
+    if (plaintextRecords.length === 0 && spendableRecords.length === 0) {
       return []
     }
+
+    const spendableById = new Map<string, string>()
+    for (const item of spendableRecords) {
+      const payload = extractRecordInput(item)
+      if (!payload || !item || typeof item !== 'object') continue
+      const id = (item as Record<string, unknown>).id
+      if (typeof id === 'string' && id.trim().length > 0) {
+        spendableById.set(id, payload)
+      }
+    }
+
+    const baseRecords = plaintextRecords.length > 0 ? plaintextRecords : spendableRecords
+
+    return baseRecords.map((item, index) => {
+      const fallbackPayload = extractRecordInput(spendableRecords[index])
+
+      if (!item || typeof item !== 'object') {
+        const asString = extractRecordInput(item)
+        return {
+          record: asString ?? String(item),
+          __recordInput: fallbackPayload ?? asString,
+        } as Record<string, unknown>
+      }
+
+      const source = item as Record<string, unknown>
+      const id = typeof source.id === 'string' ? source.id : ''
+      const fromId = id ? spendableById.get(id) : null
+      const fromSelf = extractRecordInput(source)
+      const recordInput = fromId ?? fallbackPayload ?? fromSelf
+
+      return {
+        ...source,
+        __recordInput: recordInput,
+      }
+    })
   }, [adapter.connected, adapter.requestRecords])
 
   return {

@@ -18,18 +18,46 @@ interface ParsedCredential {
 function parseRecord(record: Record<string, unknown>): ParsedCredential | null {
   try {
     const data = (record.data || record) as Record<string, string>
+    const parseBool = (value: unknown) => String(value ?? '').toLowerCase().includes('true')
     return {
       raw: record,
       owner: String(data.owner || ''),
       issuer: String(data.issuer || ''),
       age: parseInt(String(data.age || '0').replace('u8', '')) || 0,
       countryCode: parseInt(String(data.country_code || '0').replace('u16', '')) || 0,
-      kycPassed: String(data.kyc_passed) === 'true',
-      accreditedInvestor: String(data.accredited_investor) === 'true',
+      kycPassed: parseBool(data.kyc_passed),
+      accreditedInvestor: parseBool(data.accredited_investor),
     }
   } catch {
     return null
   }
+}
+
+function isCredentialRecord(record: Record<string, unknown>): boolean {
+  const candidates = [
+    record.recordName,
+    record.type,
+    (record.data as Record<string, unknown> | undefined)?.recordName,
+    (record.data as Record<string, unknown> | undefined)?.type,
+  ]
+  const marker = candidates
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+    .toLowerCase()
+
+  if (marker) {
+    return marker.includes('credential') && !marker.includes('proof')
+  }
+
+  const data = (record.data || record) as Record<string, unknown>
+  return (
+    'owner' in data
+    && 'issuer' in data
+    && 'age' in data
+    && 'country_code' in data
+    && 'kyc_passed' in data
+    && 'accredited_investor' in data
+  )
 }
 
 export default function Credentials() {
@@ -43,10 +71,7 @@ export default function Credentials() {
     try {
       const raw = await getRecords()
       const credentials = raw
-        .filter(r => {
-          const name = String((r as Record<string, unknown>).recordName || (r as Record<string, unknown>).type || '')
-          return name.includes('Credential') && !name.includes('Proof')
-        })
+        .filter(r => isCredentialRecord(r as Record<string, unknown>))
         .map(r => parseRecord(r as Record<string, unknown>))
         .filter((c): c is ParsedCredential => c !== null)
       setRecords(credentials)
