@@ -340,7 +340,7 @@ export default function Prove() {
               </button>
             ))}
 
-            {import.meta.env.DEV && selectedRecordDebug && (
+            {/* {import.meta.env.DEV && selectedRecordDebug && (
               <div className="rounded-xl p-4 mt-2" style={{ border: '2px dashed var(--color-ink)', background: '#f9fafb' }}>
                 <div className="font-bold text-xs mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
                   Selected Record Debug (DEV only)
@@ -359,7 +359,7 @@ export default function Prove() {
                       : JSON.stringify(selectedRecordInputDebug, null, 2)}
                 </pre>
               </div>
-            )}
+            )} */}
           </div>
         ) : (
           <div className="text-center py-6">
