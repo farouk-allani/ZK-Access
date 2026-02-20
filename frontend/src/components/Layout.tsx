@@ -21,8 +21,8 @@ export default function Layout({ children }: { children: ReactNode }) {
         }}
       >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Built on Aleo - Zero-Knowledge Proofs by Default</span>
-          <span style={{ color: '#6b7280' }}>ZK-Access v1.0</span>
+          <span>Built on Aleo — Zero-Knowledge by Default</span>
+          <span style={{ color: '#6b7280' }}>ZK-Access v2.0</span>
         </div>
       </footer>
       <ToastContainer />

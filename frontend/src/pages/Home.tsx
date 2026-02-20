@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, CheckCircle, Zap } from 'lucide-react'
 import { useWallet } from '../context/WalletContext'
+import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const FEATURES = [
   {
@@ -12,21 +13,21 @@ const FEATURES = [
   },
   {
     title: 'Prove Privately',
-    desc: 'Generate ZK proofs that reveal only a boolean result. Your data stays hidden.',
+    desc: 'Generate proofs that reveal only a boolean result. Your data stays hidden.',
     color: 'var(--color-purple)',
     icon: Eye,
     link: '/prove',
   },
   {
-    title: 'Verify Instantly',
-    desc: 'Anyone can verify a proof on-chain. No personal data ever leaves your wallet.',
+    title: 'Verify On-Chain',
+    desc: 'Every proof is a real Aleo transaction. Verify it on AleoScan.',
     color: 'var(--color-lime)',
     icon: CheckCircle,
     link: '/verify',
   },
   {
     title: 'Full Privacy',
-    desc: 'Powered by Aleo\'s ZK-SNARKs. Execution is local, proofs are cryptographic.',
+    desc: 'Powered by Aleo. Execution is local, records are encrypted, privacy is the default.',
     color: 'var(--color-amber)',
     icon: Lock,
     link: '/',
@@ -37,28 +38,28 @@ const STEPS = [
   {
     num: '01',
     title: 'Get a Credential',
-    desc: 'A trusted issuer (KYC provider, government, institution) issues an encrypted credential record to your Aleo wallet.',
+    desc: 'A trusted issuer creates an encrypted credential record in your wallet. It contains your claims (age, KYC status, country) but only you can see them.',
     icon: Fingerprint,
     color: 'var(--color-sky)',
   },
   {
     num: '02',
     title: 'Generate a Proof',
-    desc: 'Locally on your device, prove a claim (e.g., "I am 18+") without revealing any underlying data. The record is consumed and re-issued to you.',
+    desc: 'Prove a claim like "I am 18+" without revealing your actual age. The credential is consumed and returned to you so you can reuse it.',
     icon: Zap,
     color: 'var(--color-purple)',
   },
   {
     num: '03',
-    title: 'Verify On-Chain',
-    desc: 'The verifier checks the ZK-SNARK proof. They learn only the boolean result. Your identity, age, country — all stay private.',
+    title: 'Done — On-Chain',
+    desc: 'The transaction is recorded on the Aleo network. Anyone can verify the proof happened, but nobody can see your private data.',
     icon: Shield,
     color: 'var(--color-mint)',
   },
 ]
 
 export default function Home() {
-  const { connected, connect } = useWallet()
+  const { connected } = useWallet()
 
   return (
     <div className="page-enter">
@@ -69,7 +70,7 @@ export default function Home() {
             className="brut-badge inline-flex mb-6"
             style={{ background: 'var(--color-amber)', fontSize: '0.9rem', padding: '0.4rem 1rem' }}
           >
-            Powered by Aleo ZK-SNARKs
+            Live on Aleo Testnet
           </div>
           <h1
             className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight mb-6"
@@ -94,20 +95,14 @@ export default function Home() {
                 Start Issuing <ArrowRight size={20} strokeWidth={2.5} />
               </Link>
             ) : (
-              <button
-                onClick={connect}
-                className="brut-btn brut-btn-lg"
-                style={{ background: 'var(--color-lime)' }}
-              >
-                Connect Wallet <ArrowRight size={20} strokeWidth={2.5} />
-              </button>
+              <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
             )}
             <Link
-              to="/verify"
+              to="/credentials"
               className="brut-btn brut-btn-lg"
               style={{ background: 'white' }}
             >
-              Verify a Proof
+              View Credentials
             </Link>
           </div>
         </div>
@@ -239,7 +234,7 @@ export default function Home() {
             Ready to prove without revealing?
           </h2>
           <p className="mb-8" style={{ color: '#9ca3af', maxWidth: '500px', margin: '0 auto 2rem' }}>
-            Connect your wallet and experience zero-knowledge identity verification in under a minute.
+            Connect your Leo Wallet and experience zero-knowledge identity verification on Aleo.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {connected ? (
@@ -251,13 +246,7 @@ export default function Home() {
                 View My Credentials <ArrowRight size={20} strokeWidth={2.5} />
               </Link>
             ) : (
-              <button
-                onClick={connect}
-                className="brut-btn brut-btn-lg"
-                style={{ background: 'var(--color-lime)' }}
-              >
-                Connect Wallet <ArrowRight size={20} strokeWidth={2.5} />
-              </button>
+              <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
             )}
           </div>
         </div>

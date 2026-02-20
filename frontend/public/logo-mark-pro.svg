@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ZK-Access Professional Logo Mark</title>
+  <desc id="desc">Minimal shield mark with monoline Z and verification accent</desc>
+
+  <rect x="52" y="52" width="408" height="408" rx="96" fill="#FFFBF0" stroke="#1A1A2E" stroke-width="20"/>
+
+  <path d="M256 108C315 108 362 131 362 131V241C362 314 318 373 256 404C194 373 150 314 150 241V131C150 131 197 108 256 108Z" fill="#A855F7" stroke="#1A1A2E" stroke-width="16"/>
+
+  <path d="M202 189H312L202 323H312" stroke="#FFFBF0" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="318" cy="334" r="30" fill="#84CC16" stroke="#1A1A2E" stroke-width="12"/>
+  <path d="M304 334L315 345L333 324" stroke="#1A1A2E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

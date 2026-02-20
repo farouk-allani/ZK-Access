@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Shield, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
+import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 import { useWallet } from '../context/WalletContext'
 
 const NAV_LINKS = [
@@ -8,11 +9,11 @@ const NAV_LINKS = [
   { to: '/issue', label: 'Issue' },
   { to: '/credentials', label: 'Credentials' },
   { to: '/prove', label: 'Prove' },
-  { to: '/verify', label: 'Verify' },
+  { to: '/verify', label: 'Activity' },
 ]
 
 export default function Navbar() {
-  const { connected, address, connect, disconnect } = useWallet()
+  const { connected, address } = useWallet()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -22,8 +23,8 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 no-underline">
-            <div className="w-10 h-10 rounded-xl bg-coral flex items-center justify-center" style={{ border: '3px solid var(--color-ink)' }}>
-              <Shield size={20} strokeWidth={3} color="var(--color-ink)" />
+            <div className="w-12 h-10 rounded-xl overflow-hidden" >
+              <img src="/logo-mark-cyber.svg" alt="ZK-Access logo" className="w-full h-full object-cover" />
             </div>
             <span className="font-heading text-xl font-bold text-ink" style={{ fontFamily: 'var(--font-heading)' }}>
               ZK-Access
@@ -51,32 +52,16 @@ export default function Navbar() {
 
           {/* Wallet button */}
           <div className="flex items-center gap-3">
-            {connected ? (
-              <div className="hidden sm:flex items-center gap-2">
-                <div
-                  className="brut-badge"
-                  style={{ background: 'var(--color-mint)', fontSize: '0.75rem' }}
-                >
-                  <div className="w-2 h-2 rounded-full bg-ink" />
-                  {address!.slice(0, 8)}...{address!.slice(-4)}
-                </div>
-                <button
-                  onClick={disconnect}
-                  className="brut-btn text-sm"
-                  style={{ background: '#fee2e2', padding: '0.5rem 1rem', fontSize: '0.8rem' }}
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={connect}
-                className="brut-btn"
-                style={{ background: 'var(--color-lime)', padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+            {connected && address && (
+              <div
+                className="brut-badge hidden sm:inline-flex"
+                style={{ background: 'var(--color-mint)', fontSize: '0.75rem' }}
               >
-                Connect Wallet
-              </button>
+                <div className="w-2 h-2 rounded-full bg-ink" />
+                {address.slice(0, 8)}...{address.slice(-4)}
+              </div>
             )}
+            <WalletMultiButton className="wallet-adapter-btn-override" />
 
             {/* Mobile menu button */}
             <button
@@ -109,15 +94,6 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          {connected && (
-            <button
-              onClick={() => { disconnect(); setMobileOpen(false) }}
-              className="brut-btn w-full mt-2 text-sm"
-              style={{ background: '#fee2e2' }}
-            >
-              Disconnect ({address!.slice(0, 8)}...)
-            </button>
-          )}
         </div>
       )}
     </nav>
