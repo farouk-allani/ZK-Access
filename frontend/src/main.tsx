@@ -8,11 +8,14 @@ import { Network } from '@provablehq/aleo-types'
 import '@provablehq/aleo-wallet-adaptor-react-ui/dist/styles.css'
 import './index.css'
 import App from './App'
+import { LeoWalletAdapter } from './adapters/LeoWalletAdapter'
+
+const wallets = [new LeoWalletAdapter()]
 
 function Root() {
   return (
     <AleoWalletProvider
-      wallets={[]}
+      wallets={wallets}
       decryptPermission={DecryptPermission.UponRequest}
       network={Network.TESTNET}
       programs={['zkaccess_v2.aleo']}
