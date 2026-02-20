@@ -2,7 +2,7 @@
 
 Privacy-preserving identity verification on Aleo. Issue credentials, generate zero-knowledge proofs, and verify claims — without exposing personal data.
 
-**Live Demo:** [zkaccess.vercel.app](https://zkaccess.vercel.app)
+**Live Demo:** [zk-access-liard.vercel.app](https://zk-access-liard.vercel.app)
 **Program:** [`zkaccess_v2.aleo`](https://testnet.aleoscan.io/program?id=zkaccess_v2.aleo)
 **Deployment TX:** [`at1ugt2...st0wfu`](https://testnet.aleoscan.io/transaction?id=at1ugt2fd9rqvcgk05846tt4f5yyju9vw9zckykc69kqgfezrndcczsst0wfu)
 
@@ -29,7 +29,7 @@ Traditional identity verification requires sharing sensitive personal data (pass
 > Requires [Shield Wallet](https://shield.app) or [Leo Wallet](https://www.leo.app/) browser extension on Aleo Testnet.
 
 1. Install Shield Wallet (or Leo Wallet) and switch to **Testnet**
-2. Visit the [live demo](https://zkaccess.vercel.app) and connect your wallet
+2. Visit the [live demo](https://zk-access-liard.vercel.app) and connect your wallet
 3. Go to **Issue Credential** — fill in the form and submit (your wallet will prompt approval)
 4. Wait ~30-60s for confirmation, then check **My Credentials** to see your credential record
 5. Go to **Generate Proof** — select your credential, pick a proof type (e.g., Age Minimum), and submit
@@ -50,10 +50,10 @@ Every action is a real Aleo transaction. No mocks, no simulations.
 │  │ (Leo Wallet)  │◄──│  • Issue page                 │   │
 │  │               │   │  • Credentials page            │   │
 │  │ Signs txs     │──►│  • Prove page                 │   │
-│  │ Stores records│   │  • Activity page              │   │
+│  │ Stores records│   │  • Verify page (Activity)     │   │
 │  └──────────────┘   └───────────────────────────────┘   │
 │         │                          │                     │
-│         │   @provablehq/aleo-wallet-adaptor              │
+│         │   @provablehq/aleo-wallet-adaptor-react        │
 └─────────┼──────────────────────────┼─────────────────────┘
           │                          │
           ▼                          ▼
@@ -111,8 +111,8 @@ Every `prove_*` transition consumes the credential and returns it alongside a pr
 
 - **Leo** — Aleo's ZK programming language
 - **Aleo Testnet** — privacy-preserving L1
-- **Shield Wallet / Leo Wallet** — via `@provablehq/aleo-wallet-adaptor` (official Provable SDK)
-- **React 19 + Vite + Tailwind 4** — frontend
+- **Leo Wallet** — via `@provablehq/aleo-wallet-adaptor-core/react/react-ui` (official Provable SDK)
+- **React 18 + Vite + Tailwind 4** — frontend
 - **TypeScript** — full type safety
 
 ---
@@ -128,7 +128,7 @@ aleo-zk/
 │   ├── src/
 │   │   ├── main.tsx        # AleoWalletProvider + WalletModalProvider
 │   │   ├── context/        # Wallet integration (executeTransaction, requestRecords)
-│   │   ├── pages/          # Issue, Credentials, Prove, Activity
+│   │   ├── pages/          # Home, Issue, Credentials, Prove, Verify
 │   │   ├── components/     # Navbar, Layout, ToastContainer
 │   │   └── types/          # TypeScript types
 │   └── package.json
@@ -167,7 +167,7 @@ leo deploy --private-key YOUR_KEY --network testnet \
   - Removed identity.aleo, credential.aleo, verifier.aleo
   - Single `zkaccess_v2.aleo` with 5 transitions, no mappings, no admin roles, no nullifiers
 - **Replaced fake wallet mock with real Shield Wallet / Leo Wallet integration**
-  - Migrated to `@provablehq/aleo-wallet-adaptor` (official Provable SDK)
+  - Migrated to `@provablehq/aleo-wallet-adaptor-react` (official Provable SDK)
   - Every action (issue, prove) is a real on-chain Aleo transaction
   - Records are fetched from the wallet, not localStorage
 - **Complete frontend rewrite for real on-chain interactions**
