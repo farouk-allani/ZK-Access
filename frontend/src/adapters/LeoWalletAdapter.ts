@@ -28,13 +28,29 @@ interface LeoWalletDirect {
     network: string,
   ): Promise<{ publicKey: string } | void>
   disconnect(): Promise<void>
-  requestRecords(program: string): Promise<unknown[]>
-  requestExecution(options: {
-    programId: string
-    functionName: string
-    inputs: string[]
+  requestRecordPlaintexts?(program: string): Promise<unknown[] | { records?: unknown[] }>
+  requestRecords(program: string): Promise<unknown[] | { records?: unknown[] }>
+  requestTransaction?(transaction: {
+    address: string
+    chainId: string
+    transitions: Array<{
+      program: string
+      functionName: string
+      inputs: unknown[]
+    }>
     fee?: number
-    privateFee?: boolean
+    feePrivate?: boolean
+  }): Promise<{ transactionId: string } | string>
+  requestExecution?(transaction: {
+    address: string
+    chainId: string
+    transitions: Array<{
+      program: string
+      functionName: string
+      inputs: unknown[]
+    }>
+    fee?: number
+    feePrivate?: boolean
   }): Promise<{ transactionId: string } | string>
 }
 
@@ -81,6 +97,18 @@ function mapConnectError(error: unknown, network: Network): WalletConnectionErro
 
 function isStandardWallet(w: LeoWalletAPI): w is LeoWalletStandard {
   return 'features' in w && w.features != null && typeof w.features === 'object'
+}
+
+function parseLeoInput(input: string): unknown {
+  const trimmed = input.trim()
+  if (!trimmed) return input
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return input
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    return input
+  }
 }
 
 const LEO_WALLET_ICON =
@@ -196,13 +224,39 @@ export class LeoWalletAdapter extends BaseAleoWalletAdapter {
       return super.executeTransaction(options)
     }
 
-    const raw = await (leo as LeoWalletDirect).requestExecution({
-      programId: options.program,
-      functionName: options.function,
-      inputs: options.inputs,
+    const program = (options as TransactionOptions & { programId?: string }).program
+      ?? (options as TransactionOptions & { programId?: string }).programId
+    const functionName = (options as TransactionOptions & { functionName?: string }).function
+      ?? (options as TransactionOptions & { functionName?: string }).functionName
+
+    if (!program || !functionName) {
+      throw new WalletConnectionError('Missing program/function for Leo transaction request')
+    }
+
+    const direct = leo as LeoWalletDirect
+    const chainId = toLeoNetwork(this.network)
+    const parsedInputs = options.inputs.map(input => parseLeoInput(input))
+    const txRequest = {
+      address: this.account.address,
+      chainId,
+      transitions: [
+        {
+          program,
+          functionName,
+          inputs: parsedInputs,
+        },
+      ],
       fee: options.fee,
-      privateFee: options.privateFee ?? false,
-    })
+      feePrivate: options.privateFee ?? false,
+    }
+
+    const raw = direct.requestTransaction
+      ? await direct.requestTransaction(txRequest)
+      : await direct.requestExecution?.(txRequest)
+
+    if (!raw) {
+      throw new WalletConnectionError('Leo Wallet did not return a transaction id')
+    }
 
     return typeof raw === 'string' ? { transactionId: raw } : raw
   }
@@ -217,6 +271,16 @@ export class LeoWalletAdapter extends BaseAleoWalletAdapter {
       return super.requestRecords(program, includePlaintext)
     }
 
-    return (leo as LeoWalletDirect).requestRecords(program)
+    const direct = leo as LeoWalletDirect
+    const response = includePlaintext && direct.requestRecordPlaintexts
+      ? await direct.requestRecordPlaintexts(program)
+      : await direct.requestRecords(program)
+    if (Array.isArray(response)) {
+      return response
+    }
+    if (response && typeof response === 'object' && Array.isArray(response.records)) {
+      return response.records
+    }
+    return []
   }
 }
