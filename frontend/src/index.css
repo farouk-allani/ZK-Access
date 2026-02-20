@@ -255,3 +255,77 @@ h1, h2, h3, h4, h5, h6 {
 .page-enter {
   animation: page-in 0.35s ease-out;
 }
+
+/* ===== WALLET ADAPTER BUTTON OVERRIDES ===== */
+.wallet-adapter-btn-override {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  border-radius: 1rem !important;
+  border: 3px solid var(--color-ink) !important;
+  box-shadow: 4px 4px 0 0 var(--color-ink) !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  padding: 0.6rem 1.2rem !important;
+  cursor: pointer !important;
+  background: var(--color-lime) !important;
+  color: var(--color-ink) !important;
+  transition: all 0.15s ease !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+}
+
+.wallet-adapter-btn-override:hover {
+  box-shadow: 2px 2px 0 0 var(--color-ink) !important;
+  transform: translate(2px, 2px) !important;
+}
+
+.wallet-adapter-btn-override:active {
+  box-shadow: 0 0 0 0 var(--color-ink) !important;
+  transform: translate(4px, 4px) !important;
+}
+
+.wallet-adapter-btn-hero {
+  font-size: 1.125rem !important;
+  padding: 1rem 2rem !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 6px 6px 0 0 var(--color-ink) !important;
+  background: var(--color-coral) !important;
+}
+
+.wallet-adapter-btn-hero:hover {
+  box-shadow: 3px 3px 0 0 var(--color-ink) !important;
+  transform: translate(3px, 3px) !important;
+}
+
+/* Override wallet adapter modal styles */
+.wallet-adapter-modal-wrapper {
+  font-family: var(--font-body) !important;
+}
+
+.wallet-adapter-modal-wrapper .wallet-adapter-button {
+  border-radius: 1rem !important;
+  border: 2px solid var(--color-ink) !important;
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
+}
+
+.wallet-adapter-dropdown-list {
+  border-radius: 1rem !important;
+  border: 3px solid var(--color-ink) !important;
+  box-shadow: 4px 4px 0 0 var(--color-ink) !important;
+  background: white !important;
+  overflow: hidden !important;
+}
+
+.wallet-adapter-dropdown-list-item {
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
+  color: var(--color-ink) !important;
+}
+
+.wallet-adapter-dropdown-list-item:hover {
+  background: var(--color-cream) !important;
+}

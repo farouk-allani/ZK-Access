@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
-import { WalletProvider } from './context/WalletContext'
+import { AppProvider } from './context/WalletContext'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Issue from './pages/Issue'
@@ -9,7 +9,7 @@ import Verify from './pages/Verify'
 
 export default function App() {
   return (
-    <WalletProvider>
+    <AppProvider>
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -19,6 +19,6 @@ export default function App() {
           <Route path="/verify" element={<Verify />} />
         </Routes>
       </Layout>
-    </WalletProvider>
+    </AppProvider>
   )
 }

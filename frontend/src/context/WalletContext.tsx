@@ -1,174 +1,129 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import type { Credential, Proof, Toast } from '../types'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { useWallet as useAdapterWallet } from '@provablehq/aleo-wallet-adaptor-react'
+import type { Toast, TxRecord } from '../types'
 
-function generateAddress(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let result = 'aleo1'
-  for (let i = 0; i < 58; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return result
-}
+export const PROGRAM_ID = 'zkaccess_v2.aleo'
+const DEFAULT_FEE = 100_000
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
 
-interface WalletContextType {
-  address: string | null
-  connected: boolean
-  credentials: Credential[]
-  proofs: Proof[]
+interface AppContextType {
   toasts: Toast[]
-  connect: () => void
-  disconnect: () => void
-  issueCredential: (data: Omit<Credential, 'id' | 'issuer' | 'issuedAt' | 'expiresAt'>) => void
-  generateProof: (credentialId: string, proofType: Proof['proofType'], params: Record<string, unknown>) => Proof | null
   addToast: (message: string, type: Toast['type']) => void
   removeToast: (id: string) => void
+  transactions: TxRecord[]
+  addTransaction: (tx: TxRecord) => void
 }
 
-const WalletContext = createContext<WalletContextType | null>(null)
+const AppContext = createContext<AppContextType | null>(null)
 
-const STORAGE_KEY = 'zkaccess_wallet'
-
-interface StoredState {
-  address: string
-  credentials: Credential[]
-  proofs: Proof[]
-}
-
-export function WalletProvider({ children }: { children: ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null)
-  const [credentials, setCredentials] = useState<Credential[]>([])
-  const [proofs, setProofs] = useState<Proof[]>([])
+export function AppProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
-
-  // Load from localStorage on mount
-  useEffect(() => {
+  const [transactions, setTransactions] = useState<TxRecord[]>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const data: StoredState = JSON.parse(stored)
-        setAddress(data.address)
-        setCredentials(data.credentials || [])
-        setProofs(data.proofs || [])
-      }
+      const stored = localStorage.getItem('zkaccess_txs')
+      return stored ? JSON.parse(stored) : []
     } catch {
-      // ignore
+      return []
     }
-  }, [])
-
-  // Save to localStorage on changes
-  useEffect(() => {
-    if (address) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ address, credentials, proofs }))
-    }
-  }, [address, credentials, proofs])
+  })
 
   const addToast = useCallback((message: string, type: Toast['type']) => {
     const id = generateId()
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
-    }, 3500)
+    }, 4000)
   }, [])
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const connect = useCallback(() => {
-    const addr = generateAddress()
-    setAddress(addr)
-    addToast('Wallet connected!', 'success')
-  }, [addToast])
-
-  const disconnect = useCallback(() => {
-    setAddress(null)
-    setCredentials([])
-    setProofs([])
-    localStorage.removeItem(STORAGE_KEY)
-    addToast('Wallet disconnected', 'info')
-  }, [addToast])
-
-  const issueCredential = useCallback((data: Omit<Credential, 'id' | 'issuer' | 'issuedAt' | 'expiresAt'>) => {
-    if (!address) return
-    const cred: Credential = {
-      ...data,
-      id: generateId(),
-      issuer: address,
-      issuedAt: Date.now(),
-      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-    }
-    setCredentials(prev => [...prev, cred])
-    addToast('Credential issued successfully!', 'success')
-  }, [address, addToast])
-
-  const generateProof = useCallback((credentialId: string, proofType: Proof['proofType'], params: Record<string, unknown>): Proof | null => {
-    const cred = credentials.find(c => c.id === credentialId)
-    if (!cred || !address) return null
-
-    let result = false
-    switch (proofType) {
-      case 'age':
-        result = cred.age >= (params.minimumAge as number || 18)
-        break
-      case 'kyc':
-        result = cred.kycPassed
-        break
-      case 'country': {
-        const restricted = [408, 364, 760, 192]
-        result = !restricted.includes(cred.countryCode)
-        break
-      }
-      case 'accredited':
-        result = cred.accreditedInvestor
-        break
-      case 'composite':
-        result = cred.age >= (params.minimumAge as number || 18)
-          && cred.kycPassed
-          && ![408, 364, 760, 192].includes(cred.countryCode)
-        break
-    }
-
-    const proof: Proof = {
-      id: generateId(),
-      credentialId,
-      proofType,
-      result,
-      params,
-      generatedAt: Date.now(),
-      nonce: generateId(),
-      owner: address,
-    }
-
-    setProofs(prev => [...prev, proof])
-    addToast(result ? 'Proof generated - VALID' : 'Proof generated - INVALID', result ? 'success' : 'error')
-    return proof
-  }, [credentials, address, addToast])
+  const addTransaction = useCallback((tx: TxRecord) => {
+    setTransactions(prev => {
+      const updated = [tx, ...prev].slice(0, 50)
+      localStorage.setItem('zkaccess_txs', JSON.stringify(updated))
+      return updated
+    })
+  }, [])
 
   return (
-    <WalletContext.Provider value={{
-      address,
-      connected: !!address,
-      credentials,
-      proofs,
-      toasts,
-      connect,
-      disconnect,
-      issueCredential,
-      generateProof,
-      addToast,
-      removeToast,
-    }}>
+    <AppContext.Provider value={{ toasts, addToast, removeToast, transactions, addTransaction }}>
       {children}
-    </WalletContext.Provider>
+    </AppContext.Provider>
   )
 }
 
-export function useWallet() {
-  const ctx = useContext(WalletContext)
-  if (!ctx) throw new Error('useWallet must be used within WalletProvider')
+export function useApp() {
+  const ctx = useContext(AppContext)
+  if (!ctx) throw new Error('useApp must be used within AppProvider')
   return ctx
+}
+
+export function useWallet() {
+  const adapter = useAdapterWallet()
+  const app = useApp()
+
+  const executeTransition = useCallback(async (
+    functionName: string,
+    inputs: string[],
+    fee = DEFAULT_FEE,
+  ): Promise<string | null> => {
+    if (!adapter.connected) {
+      app.addToast('Wallet not connected', 'error')
+      return null
+    }
+
+    try {
+      const result = await adapter.executeTransaction({
+        program: PROGRAM_ID,
+        function: functionName,
+        inputs,
+        fee,
+      })
+
+      const txId = result?.transactionId || ''
+
+      app.addTransaction({
+        id: txId,
+        functionName,
+        timestamp: Date.now(),
+        status: 'submitted',
+      })
+
+      app.addToast('Transaction submitted!', 'success')
+      return txId
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Transaction failed'
+      app.addToast(msg, 'error')
+      return null
+    }
+  }, [adapter.connected, adapter.executeTransaction, app])
+
+  const getRecords = useCallback(async (): Promise<Record<string, unknown>[]> => {
+    if (!adapter.connected) return []
+    try {
+      const records = await adapter.requestRecords(PROGRAM_ID)
+      return records as Record<string, unknown>[]
+    } catch {
+      return []
+    }
+  }, [adapter.connected, adapter.requestRecords])
+
+  return {
+    address: adapter.address || null,
+    connected: adapter.connected,
+    connecting: adapter.connecting,
+
+    toasts: app.toasts,
+    addToast: app.addToast,
+    removeToast: app.removeToast,
+
+    transactions: app.transactions,
+    executeTransition,
+    getRecords,
+  }
 }

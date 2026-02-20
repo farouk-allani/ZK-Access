@@ -1,0 +1,6 @@
+{
+  "program": "zkaccess_v2.aleo",
+  "version": "0.1.0",
+  "description": "ZK-Access: Simple privacy-preserving credentials on Aleo",
+  "license": "MIT"
+}

@@ -1,112 +1,119 @@
-# ZK-Access: Production-Grade Privacy Infrastructure for Aleo
+# ZK-Access
 
-**Cryptographically-sound identity and credential verification with real ZK proofs.**
+Privacy-preserving identity verification on Aleo. Issue credentials, generate zero-knowledge proofs, and verify claims — without exposing personal data.
+
+**Live Demo:** [zkaccess.vercel.app](https://zkaccess.vercel.app)
+**Program:** [`zkaccess_v2.aleo`](https://testnet.aleoscan.io/program?id=zkaccess_v2.aleo)
+**Deployment TX:** [`at1ugt2...st0wfu`](https://testnet.aleoscan.io/transaction?id=at1ugt2fd9rqvcgk05846tt4f5yyju9vw9zckykc69kqgfezrndcczsst0wfu)
 
 ---
 
-## Overview
+## What It Does
 
-ZK-Access is a privacy-preserving identity and credential system built for Aleo mainnet deployment. It implements:
+ZK-Access lets users prove things about themselves (age, KYC status, country, accredited investor) without revealing the underlying data.
 
-- **Private Identity Vaults** with nullifier-based clone prevention
-- **Verifiable Credentials** with real ZK constraint logic
-- **Selective Disclosure Proofs** that reveal ONLY boolean results
-- **Privacy-Preserving Revocation** via unlinkable nullifiers
-- **Composable Verification** for third-party protocol integration
+1. **Issue a Credential** — An issuer creates an encrypted credential record in the user's wallet
+2. **Generate a Proof** — The user proves a claim like "I am 18+" without revealing their actual age
+3. **Verify On-Chain** — The proof is a real Aleo transaction, verifiable on [AleoScan](https://testnet.aleoscan.io)
+
+Only a boolean result (pass/fail) is ever revealed. The credential data stays fully private.
+
+### Why Privacy Matters Here
+
+Traditional identity verification requires sharing sensitive personal data (passport, ID, date of birth) with every service that needs it. Each verification creates a new point of data exposure. ZK-Access flips this: the user holds their credential privately and reveals only what's needed (a yes/no answer) to any verifier. No data leaves the wallet.
+
+---
+
+## Demo Walkthrough
+
+> Requires [Shield Wallet](https://shield.app) or [Leo Wallet](https://www.leo.app/) browser extension on Aleo Testnet.
+
+1. Install Shield Wallet (or Leo Wallet) and switch to **Testnet**
+2. Visit the [live demo](https://zkaccess.vercel.app) and connect your wallet
+3. Go to **Issue Credential** — fill in the form and submit (your wallet will prompt approval)
+4. Wait ~30-60s for confirmation, then check **My Credentials** to see your credential record
+5. Go to **Generate Proof** — select your credential, pick a proof type (e.g., Age Minimum), and submit
+6. Check **Activity** to see all your transactions with AleoScan links
+
+Every action is a real Aleo transaction. No mocks, no simulations.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      ZK-ACCESS SYSTEM ARCHITECTURE                           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐      │
-│  │  identity.aleo   │    │ credential.aleo  │    │  verifier.aleo   │      │
-│  ├──────────────────┤    ├──────────────────┤    ├──────────────────┤      │
-│  │ • Identity vault │    │ • ZK proof gen   │    │ • Proof verify   │      │
-│  │ • Binding tokens │───▶│ • Issuer auth    │───▶│ • Replay prevent │      │
-│  │ • Clone prevent  │    │ • Revocation     │    │ • Result compose │      │
-│  └──────────────────┘    └──────────────────┘    └──────────────────┘      │
-│                                                                              │
-│  PRIVATE (Records):     PRIVATE (Records):      PRIVATE (Records):          │
-│  - Identity             - Credential            - CredentialProof           │
-│  - IdentityBinding      - CredentialProof       - VerificationResult        │
-│                                                                              │
-│  PUBLIC (Mappings):     PUBLIC (Mappings):      PUBLIC (Mappings):          │
-│  - identity_nullifiers  - authorized_issuers   - consumed_nonces            │
-│  - used_binding_nonces  - revoked_nullifiers   - consumed_verifications     │
-│                         - issuer_nonces                                      │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                      USER (Browser)                      │
+│                                                          │
+│  ┌──────────────┐   ┌───────────────────────────────┐   │
+│  │ Shield Wallet │   │  React Frontend               │   │
+│  │ (Leo Wallet)  │◄──│  • Issue page                 │   │
+│  │               │   │  • Credentials page            │   │
+│  │ Signs txs     │──►│  • Prove page                 │   │
+│  │ Stores records│   │  • Activity page              │   │
+│  └──────────────┘   └───────────────────────────────┘   │
+│         │                          │                     │
+│         │   @provablehq/aleo-wallet-adaptor              │
+└─────────┼──────────────────────────┼─────────────────────┘
+          │                          │
+          ▼                          ▼
+┌─────────────────────────────────────────────────────────┐
+│                   ALEO TESTNET                           │
+│                                                          │
+│  zkaccess_v2.aleo                                        │
+│  ├── issue_credential(recipient, age, country, ...)      │
+│  ├── prove_age(credential, min_age) → (Credential, Proof)│
+│  ├── prove_kyc(credential) → (Credential, Proof)         │
+│  ├── prove_country(credential) → (Credential, Proof)     │
+│  └── prove_accredited(credential) → (Credential, Proof)  │
+│                                                          │
+│  All records encrypted. All execution local.             │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Programs
+## Program
 
-### identity.aleo
+**One Leo program** — [`zkaccess_v2.aleo`](https://testnet.aleoscan.io/program?id=zkaccess_v2.aleo) (~130 lines)
 
-Private identity management with cryptographic ownership enforcement.
+| Transition | What It Does |
+|---|---|
+| `issue_credential` | Creates an encrypted credential record for a user |
+| `prove_age` | Proves age ≥ minimum without revealing actual age |
+| `prove_kyc` | Proves KYC verification status |
+| `prove_country` | Proves not in a restricted country (North Korea, Iran, Syria, Cuba) |
+| `prove_accredited` | Proves accredited investor status |
 
-| Transition | Purpose | Security |
-|------------|---------|----------|
-| `create_identity` | Create identity vault | Nullifier prevents cloning |
-| `update_identity` | Update identity data | Ownership via record consumption |
-| `create_binding` | Generate binding for issuers | Nonce prevents replay |
-| `verify_commitment` | Verify data integrity | Owner-only access |
-| `destroy_identity` | Permanently delete | Owner-only, irreversible |
+**Records:**
+- `Credential` — encrypted, owned by the recipient. Contains age, country_code, kyc_passed, accredited_investor. Only the owner can decrypt.
+- `ProofResult` — owned by the prover. Contains claim_type and a boolean `passed`.
 
-### credential.aleo
-
-Verifiable credentials with real ZK proof generation.
-
-| Transition | Purpose | ZK Constraints |
-|------------|---------|----------------|
-| `issue_credential` | Issue to user | Issuer authorization in finalize |
-| `prove_age_minimum` | Prove age ≥ N | `assert(credential.age >= minimum_age)` |
-| `prove_kyc_status` | Prove KYC passed | `assert(credential.kyc_passed)` |
-| `prove_country_not_restricted` | Prove not in restricted set | `assert(country ≠ restricted[i])` |
-| `prove_accredited_investor` | Prove accreditation | `assert(credential.accredited_investor)` |
-| `prove_composite` | Multi-claim proof | Age + KYC + Country in one proof |
-| `revoke_credential` | Revoke by issuer | Requires secret, adds nullifier |
-
-### verifier.aleo
-
-Composable proof verification for third-party protocols.
-
-| Transition | Purpose | Security |
-|------------|---------|----------|
-| `verify_proof` | Verify any proof type | Nonce consumption prevents replay |
-| `verify_age_proof` | Verify age proof | Type-specific validation |
-| `verify_kyc_proof` | Verify KYC proof | Type-specific validation |
-| `consume_verification` | Use result once | Verification ID consumption |
+Every `prove_*` transition consumes the credential and returns it alongside a proof, so the credential can be reused unlimited times.
 
 ---
 
-## ZK Proof Guarantees
+## Privacy Model
 
-### What the Circuit Proves
+| What | Private? | How |
+|---|---|---|
+| Credential data (age, country, KYC, etc.) | **Always private** | Stored as encrypted Aleo records — only the owner's key can decrypt |
+| Proof result | **Boolean only** | `prove_age` reveals only "age ≥ 18: true/false", not the actual age |
+| Who issued to whom | **Private** | The issuer-recipient relationship is inside the encrypted record |
+| Transaction existence | Public | The transaction hash is visible on-chain (this is how Aleo works) |
+| Execution | **Local** | Proof generation happens entirely in the user's wallet/browser |
 
-For `prove_age_minimum(credential, minimum_age=18)`:
+**Key property:** The credential record is consumed as a private input. Aleo's execution model guarantees that private inputs are never revealed — only the program's assertions (pass/fail) are reflected in the proof.
 
-```
-∃ credential such that:
-  1. credential.owner == self.caller        (ownership)
-  2. credential.age >= minimum_age          (predicate)
-  3. credential.expires_at > current_block  (validity)
-  4. credential not in revoked_nullifiers   (not revoked)
-```
+---
 
-### What is NOT Revealed
+## Tech Stack
 
-- User's actual age (only that age ≥ 18)
-- User's country (only that country ∉ restricted set)
-- User's identity
-- Credential contents
-- Issuer-user relationship
+- **Leo** — Aleo's ZK programming language
+- **Aleo Testnet** — privacy-preserving L1
+- **Shield Wallet / Leo Wallet** — via `@provablehq/aleo-wallet-adaptor` (official Provable SDK)
+- **React 19 + Vite + Tailwind 4** — frontend
+- **TypeScript** — full type safety
 
 ---
 
@@ -114,106 +121,74 @@ For `prove_age_minimum(credential, minimum_age=18)`:
 
 ```
 aleo-zk/
-├── identity/
-│   ├── src/main.leo          # Identity program (356 lines)
+├── zkaccess/
+│   ├── src/main.leo        # Leo program (single file, ~130 lines)
 │   └── program.json
-├── credential/
-│   ├── src/main.leo          # Credential program (829 lines)
-│   └── program.json
-├── verifier/
-│   ├── src/main.leo          # Verifier program (340 lines)
-│   └── program.json
-├── CLI_EXAMPLES.md           # Complete CLI examples
-├── THREAT_MODEL.md           # Security analysis
-├── PRIVACY_MODEL.md          # Privacy guarantees
+├── frontend/
+│   ├── src/
+│   │   ├── main.tsx        # AleoWalletProvider + WalletModalProvider
+│   │   ├── context/        # Wallet integration (executeTransaction, requestRecords)
+│   │   ├── pages/          # Issue, Credentials, Prove, Activity
+│   │   ├── components/     # Navbar, Layout, ToastContainer
+│   │   └── types/          # TypeScript types
+│   └── package.json
 └── README.md
 ```
 
 ---
 
-## Testnet Deployment
+## Run Locally
 
-All programs have been deployed to Aleo Testnet.
+```bash
+cd frontend
+npm install --legacy-peer-deps
+npm run dev
+```
 
-| Program | Program ID | Transaction ID |
-|---------|------------|----------------|
-| **Identity** | `zkaccess_id_v1.aleo` | [`at1upv50wart4lal3sqwf7qyvjwk0lf4l7l40wpjjg2vze0schkx59s9lgj7f`](https://testnet.aleoscan.io/transaction?id=at1upv50wart4lal3sqwf7qyvjwk0lf4l7l40wpjjg2vze0schkx59s9lgj7f) |
-| **Credential** | `zkaccess_cred_v1.aleo` | [`at1rc0xjgyx7camstj9lglnn9jkgnrxgvye7sljfhreuf5qc0uhsqps85dfrf`](https://testnet.aleoscan.io/transaction?id=at1rc0xjgyx7camstj9lglnn9jkgnrxgvye7sljfhreuf5qc0uhsqps85dfrf) |
-| **Verifier** | `zkaccess_verif_v1.aleo` | [`at1qkxkadfp3cwkaqmrnzx6y05j8rfk6n6gntkey3202v4x8xphcyxq9h5unn`](https://testnet.aleoscan.io/transaction?id=at1qkxkadfp3cwkaqmrnzx6y05j8rfk6n6gntkey3202v4x8xphcyxq9h5unn) |
+The frontend connects to the already-deployed `zkaccess_v2.aleo` on Aleo Testnet. No local node needed.
 
-**Deployment Details:**
-- Network: Aleo Testnet
-- Consensus Version: 12
-- Deployer: `aleo15ac90dsv2cayepmctwtqg0qugag3myahx8nt7tnq9s3kpmu0l5xsdcz3lv`
+### Deploy the program yourself (optional)
 
----
-
-## Security Properties
-
-| Property | Mechanism | Guarantee |
-|----------|-----------|-----------|
-| **Record Privacy** | AES encryption | Only owner can decrypt |
-| **Ownership Enforcement** | Record consumption + assertion | Cryptographic, not just logical |
-| **Clone Prevention** | Nullifier registration | Cannot create duplicate identity |
-| **Issuer Authorization** | Finalize mapping check | Only authorized can issue |
-| **Replay Prevention** | Nonce tracking | Each proof/binding usable once |
-| **Revocation Privacy** | Nullifier scheme | Cannot link to credential |
+```bash
+cd zkaccess
+leo build
+leo deploy --private-key YOUR_KEY --network testnet \
+  --endpoint "https://api.explorer.provable.com/v1" \
+  --broadcast --priority-fees 5000000 --yes
+```
 
 ---
 
-## Compliance Summary
+## Wave 2 Progress Changelog
 
-### Private Identity Core ✓
+### What changed since Wave 1
 
-| Requirement | Implementation |
-|-------------|----------------|
-| Leo program `identity.aleo` | ✅ Full implementation with nullifiers |
-| Private identity record | ✅ Encrypted record with 6 fields |
-| Unique identifier (hashed) | ✅ `identity_commitment` via BHP256 |
-| Owner-only updates | ✅ Record consumption + assertion |
-| Create/read/update | ✅ All transitions implemented |
-| No public identity data | ✅ Only nullifiers in mappings |
+- **Collapsed 3 overengineered programs (~1,700 lines) into 1 clean program (~130 lines)**
+  - Removed identity.aleo, credential.aleo, verifier.aleo
+  - Single `zkaccess_v2.aleo` with 5 transitions, no mappings, no admin roles, no nullifiers
+- **Replaced fake wallet mock with real Shield Wallet / Leo Wallet integration**
+  - Migrated to `@provablehq/aleo-wallet-adaptor` (official Provable SDK)
+  - Every action (issue, prove) is a real on-chain Aleo transaction
+  - Records are fetched from the wallet, not localStorage
+- **Complete frontend rewrite for real on-chain interactions**
+  - Issue page calls `executeTransaction` with real Leo-formatted inputs
+  - Credentials page fetches and parses real encrypted records from the wallet
+  - Prove page passes real credential records as transaction inputs
+  - Activity page shows transaction history with AleoScan verification links
+- **Deployed `zkaccess_v2.aleo` to Aleo Testnet** — [view on AleoScan](https://testnet.aleoscan.io/program?id=zkaccess_v2.aleo)
+- **Removed unnecessary documentation** (threat model, privacy model docs, CLI examples)
+- **Cleaned up project structure** — deleted old programs, tests directory
 
-### Private Credentials ✓
+### Feedback incorporated
+- "Too many programs" → Simplified to 1 program
+- "Frontend is a mockup" → Now real wallet integration with on-chain transactions
+- "Mentions SNARK verification unnecessarily" → Removed all academic language
 
-| Requirement | Implementation |
-|-------------|----------------|
-| Leo program `credential.aleo` | ✅ Full implementation with ZK proofs |
-| Issuer role | ✅ `authorized_issuers` + admin control |
-| Encrypted credentials | ✅ 15-field credential record |
-| Identity binding | ✅ `subject_commitment` from identity |
-| Claims (age, country, kyc) | ✅ All implemented with ZK constraints |
-| Real ZK proofs | ✅ Circuit constraints |
-| Revocation | ✅ Nullifier-based, unlinkable |
-| Verifier program | ✅ Composable verification |
-
----
-
-## Documentation
-
-- **[CLI_EXAMPLES.md](./CLI_EXAMPLES.md)** - Complete command examples with expected outputs
-- **[THREAT_MODEL.md](./THREAT_MODEL.md)** - Security analysis and attack resistance
-- **[PRIVACY_MODEL.md](./PRIVACY_MODEL.md)** - Privacy guarantees explained
-
----
-
-## For Auditors
-
-### What to Verify
-
-1. **ZK Constraints**: Check that `assert` statements in `prove_*` transitions correctly implement the claimed predicate
-2. **Authorization Logic**: Verify finalize blocks check `authorized_issuers` before state changes
-3. **Nullifier Scheme**: Confirm nullifiers are computed correctly and checked in finalize
-4. **Replay Prevention**: Verify all nonces are registered and checked before use
-5. **Record Ownership**: Confirm `assert_eq(record.owner, self.caller)` in all relevant transitions
-
-### Key Files
-
-- `credential.aleo:370-448` - Age proof ZK constraints
-- `credential.aleo:460-527` - KYC proof ZK constraints
-- `credential.aleo:546-630` - Country restriction ZK constraints
-- `credential.aleo:327-350` - Revocation logic
-- `verifier.aleo:97-165` - Proof verification logic
+### Next wave goals
+- Add on-chain issuer authorization (mapping-based)
+- Support credential expiration
+- Mainnet deployment
+- More proof types (income range, age range)
 
 ---
 
@@ -223,4 +198,4 @@ MIT
 
 ---
 
-**Built for Aleo Buildathon** | Cryptographically Sound | Production Ready
+Built for [Aleo](https://aleo.org) | [Shield Wallet](https://shield.app) | [AleoScan](https://testnet.aleoscan.io/program?id=zkaccess_v2.aleo)

@@ -1,34 +1,17 @@
-export interface Credential {
-  id: string
-  owner: string
-  issuer: string
-  age: number
-  countryCode: number
-  kycPassed: boolean
-  accreditedInvestor: boolean
-  riskScore: number
-  issuedAt: number
-  expiresAt: number
-}
-
-export interface Proof {
-  id: string
-  credentialId: string
-  proofType: ProofType
-  result: boolean
-  params: Record<string, unknown>
-  generatedAt: number
-  nonce: string
-  owner: string
-}
-
-export type ProofType = 'age' | 'kyc' | 'country' | 'accredited' | 'composite'
-
 export interface Toast {
   id: string
   message: string
   type: 'success' | 'error' | 'info'
 }
+
+export interface TxRecord {
+  id: string
+  functionName: string
+  timestamp: number
+  status: 'submitted' | 'confirmed' | 'failed'
+}
+
+export type ProofType = 'age' | 'kyc' | 'country' | 'accredited'
 
 export const COUNTRY_NAMES: Record<number, string> = {
   840: 'United States',

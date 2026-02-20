@@ -1,0 +1,16 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ZK-Access Logo Mark</title>
+  <desc id="desc">Neo-brutalist shield with ZK monogram and keyhole</desc>
+
+  <rect x="60" y="70" width="392" height="392" rx="88" fill="#1A1A2E"/>
+  <rect x="44" y="52" width="392" height="392" rx="88" fill="#FF6B6B" stroke="#1A1A2E" stroke-width="18"/>
+
+  <path d="M256 120C316 120 365 142 365 142V246C365 318 319 378 256 408C193 378 147 318 147 246V142C147 142 196 120 256 120Z" fill="#A855F7" stroke="#1A1A2E" stroke-width="18"/>
+
+  <path d="M194 196H314" stroke="#1A1A2E" stroke-width="20" stroke-linecap="round"/>
+  <path d="M194 316H314" stroke="#1A1A2E" stroke-width="20" stroke-linecap="round"/>
+  <path d="M198 198L312 314" stroke="#1A1A2E" stroke-width="20" stroke-linecap="round"/>
+  <path d="M312 198L198 314" stroke="#1A1A2E" stroke-width="20" stroke-linecap="round"/>
+
+  <path d="M256 210C240 210 227 223 227 239C227 250 233 260 242 265V289C242 296 248 302 256 302C264 302 270 296 270 289V265C279 260 285 250 285 239C285 223 272 210 256 210Z" fill="#84CC16" stroke="#1A1A2E" stroke-width="12"/>
+</svg>

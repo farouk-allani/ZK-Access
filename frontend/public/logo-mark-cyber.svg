@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ZK-Access Cyber Mark</title>
+  <desc id="desc">Cyber-inspired shield with keyhole for secure zero-knowledge access</desc>
+
+  <defs>
+    <linearGradient id="shieldOuter" x1="128" y1="104" x2="384" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5BE7FF"/>
+      <stop offset="1" stop-color="#1F7BFF"/>
+    </linearGradient>
+    <linearGradient id="shieldInner" x1="170" y1="148" x2="342" y2="344" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3C8DFF"/>
+      <stop offset="1" stop-color="#6AF2D6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 258) rotate(90) scale(176)">
+      <stop stop-color="#4DEBFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#4DEBFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="190" fill="url(#glow)"/>
+
+  <path d="M256 92C316 124 363 134 403 140V236C403 316 348 392 256 430C164 392 109 316 109 236V140C149 134 196 124 256 92Z" fill="url(#shieldOuter)"/>
+  <path d="M256 122C308 149 349 157 383 162V234C383 303 336 367 256 401C176 367 129 303 129 234V162C163 157 204 149 256 122Z" fill="#0E1A3B"/>
+  <path d="M256 141C302 165 338 171 368 176V232C368 292 326 347 256 378C186 347 144 292 144 232V176C174 171 210 165 256 141Z" fill="url(#shieldInner)"/>
+
+  <path d="M256 142V377" stroke="#0E1A3B" stroke-opacity="0.35" stroke-width="4"/>
+  <path d="M256 142C210 165 174 171 144 176V232C144 292 186 347 256 378V142Z" fill="#0D3D96" fill-opacity="0.5"/>
+
+  <path d="M256 205C236 205 220 221 220 241C220 254 227 266 238 273V305C238 315 246 323 256 323C266 323 274 315 274 305V273C285 266 292 254 292 241C292 221 276 205 256 205Z" fill="#08132B"/>
+</svg>

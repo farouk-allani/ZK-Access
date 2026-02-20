@@ -1,0 +1,47 @@
+<svg width="1400" height="420" viewBox="0 0 1400 420" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">ZK-Access Cyber Wordmark</title>
+  <desc id="desc">Cyber-inspired shield and ZK-ACCESS wordmark</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1400" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08132E"/>
+      <stop offset="1" stop-color="#111D43"/>
+    </linearGradient>
+    <linearGradient id="shieldOuter" x1="170" y1="80" x2="375" y2="312" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5BE7FF"/>
+      <stop offset="1" stop-color="#1F7BFF"/>
+    </linearGradient>
+    <linearGradient id="shieldInner" x1="205" y1="117" x2="341" y2="275" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3C8DFF"/>
+      <stop offset="1" stop-color="#66EFD8"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="470" y1="144" x2="1090" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2BBEFF"/>
+      <stop offset="0.55" stop-color="#9EE6FF"/>
+      <stop offset="1" stop-color="#F4F8FF"/>
+    </linearGradient>
+    <filter id="softGlow" x="0" y="0" width="1400" height="420" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feBlend in="SourceGraphic" in2="blur" mode="screen"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="420" rx="36" fill="url(#bg)"/>
+
+  <g filter="url(#softGlow)">
+    <path d="M272 50C320 76 358 84 390 89V167C390 232 346 294 272 326C198 294 154 232 154 167V89C186 84 224 76 272 50Z" fill="url(#shieldOuter)"/>
+    <path d="M272 74C314 96 346 102 373 106V166C373 222 335 273 272 302C209 273 171 222 171 166V106C198 102 230 96 272 74Z" fill="#0E1A3B"/>
+    <path d="M272 90C309 109 338 114 362 117V164C362 214 328 260 272 286C216 260 182 214 182 164V117C206 114 235 109 272 90Z" fill="url(#shieldInner)"/>
+    <path d="M272 90V286" stroke="#0E1A3B" stroke-opacity="0.35" stroke-width="3"/>
+    <path d="M272 140C256 140 243 153 243 169C243 180 249 189 257 194V220C257 228 264 235 272 235C280 235 287 228 287 220V194C295 189 301 180 301 169C301 153 288 140 272 140Z" fill="#08132B"/>
+
+    <path d="M112 165H162" stroke="#55EFFF" stroke-width="10" stroke-linecap="round"/>
+    <path d="M100 191H162" stroke="#55EFFF" stroke-width="10" stroke-linecap="round"/>
+    <path d="M382 165H432" stroke="#55EFFF" stroke-width="10" stroke-linecap="round"/>
+    <path d="M382 191H444" stroke="#55EFFF" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="96" cy="191" r="9" fill="#8FF8FF"/>
+    <circle cx="448" cy="191" r="9" fill="#8FF8FF"/>
+  </g>
+
+  <text x="474" y="242" font-family="Inter, Space Grotesk, system-ui, sans-serif" font-size="136" font-weight="800" letter-spacing="-2" fill="url(#titleGrad)">ZK-ACCESS</text>
+</svg>

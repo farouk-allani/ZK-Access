@@ -1,6 +1,0 @@
-{
-  "program": "zkaccess_verif_v1.aleo",
-  "version": "0.1.0",
-  "description": "ZK-Access: Composable proof verification for third-party protocols",
-  "license": "MIT"
-}
