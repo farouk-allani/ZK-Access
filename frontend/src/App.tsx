@@ -6,6 +6,8 @@ import Issue from './pages/Issue'
 import Credentials from './pages/Credentials'
 import Prove from './pages/Prove'
 import Verify from './pages/Verify'
+import Gates from './pages/Gates'
+import Admin from './pages/Admin'
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
           <Route path="/credentials" element={<Credentials />} />
           <Route path="/prove" element={<Prove />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/gates" element={<Gates />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </Layout>
     </AppProvider>

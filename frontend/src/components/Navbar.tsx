@@ -4,18 +4,20 @@ import { useState } from 'react'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 import { useWallet } from '../context/WalletContext'
 
-const NAV_LINKS = [
-  { to: '/', label: 'Home' },
-  { to: '/issue', label: 'Issue' },
-  { to: '/credentials', label: 'Credentials' },
-  { to: '/prove', label: 'Prove' },
-  { to: '/verify', label: 'Activity' },
-]
-
 export default function Navbar() {
-  const { connected, address } = useWallet()
+  const { connected, address, isAdmin } = useWallet()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const NAV_LINKS = [
+    { to: '/', label: 'Home' },
+    { to: '/issue', label: 'Issue' },
+    { to: '/credentials', label: 'Credentials' },
+    { to: '/prove', label: 'Prove' },
+    { to: '/gates', label: 'Gates' },
+    { to: '/verify', label: 'Verify' },
+    ...(isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
+  ]
 
   return (
     <nav className="bg-cream border-b-3 border-ink sticky top-0 z-50" style={{ borderBottomWidth: '3px', borderColor: 'var(--color-ink)' }}>

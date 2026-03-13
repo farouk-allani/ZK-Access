@@ -12,7 +12,37 @@ export interface TxRecord {
   explorerId?: string
 }
 
-export type ProofType = 'age' | 'kyc' | 'country' | 'accredited'
+export type ProofType = 'age' | 'kyc' | 'country' | 'accredited' | 'gate'
+
+export interface GateConfig {
+  gateId: string
+  minAge: number
+  requireKyc: boolean
+  requireNotRestricted: boolean
+  requireAccredited: boolean
+  active: boolean
+  owner?: string
+}
+
+export interface ParsedCredential {
+  raw: Record<string, unknown>
+  owner: string
+  issuer: string
+  credentialId: string
+  age: number
+  countryCode: number
+  kycPassed: boolean
+  accreditedInvestor: boolean
+  issuedAt: number
+  expiresAt: number
+}
+
+export interface AccessTokenParsed {
+  gateId: string
+  claimType: number
+  passed: boolean
+  proofHeight: number
+}
 
 export const COUNTRY_NAMES: Record<number, string> = {
   840: 'United States',
@@ -35,3 +65,9 @@ export const COUNTRY_NAMES: Record<number, string> = {
 }
 
 export const RESTRICTED_COUNTRIES = [408, 364, 760, 192]
+
+export const VALIDITY_OPTIONS = [
+  { label: '30 days (~43,200 blocks)', value: 43200 },
+  { label: '90 days (~129,600 blocks)', value: 129600 },
+  { label: '1 year (~525,600 blocks)', value: 525600 },
+]

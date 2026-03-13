@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { useWallet } from '../context/WalletContext'
+import { useState, useEffect } from 'react'
+import { useWallet, queryMapping } from '../context/WalletContext'
 import { Link } from 'react-router-dom'
-import { Send, ArrowRight, AlertTriangle, ExternalLink } from 'lucide-react'
-import { COUNTRY_NAMES, RESTRICTED_COUNTRIES } from '../types'
+import { Send, ArrowRight, AlertTriangle, ExternalLink, ShieldCheck, ShieldX } from 'lucide-react'
+import { COUNTRY_NAMES, RESTRICTED_COUNTRIES, VALIDITY_OPTIONS } from '../types'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 export default function Issue() {
@@ -10,13 +10,30 @@ export default function Issue() {
   const [loading, setLoading] = useState(false)
   const [txId, setTxId] = useState<string | null>(null)
   const [explorerTxId, setExplorerTxId] = useState<string | null>(null)
+  const [isAuthorizedIssuer, setIsAuthorizedIssuer] = useState<boolean | null>(null)
+  const [checkingIssuer, setCheckingIssuer] = useState(false)
   const [form, setForm] = useState({
     owner: '',
     age: 25,
     countryCode: 840,
     kycPassed: true,
     accreditedInvestor: false,
+    validityBlocks: 129600,
   })
+
+  useEffect(() => {
+    if (!connected || !address) {
+      setIsAuthorizedIssuer(null)
+      return
+    }
+    const checkIssuer = async () => {
+      setCheckingIssuer(true)
+      const result = await queryMapping('authorized_issuers', address)
+      setIsAuthorizedIssuer(result === 'true')
+      setCheckingIssuer(false)
+    }
+    checkIssuer()
+  }, [connected, address])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +50,7 @@ export default function Issue() {
       `${form.countryCode}u16`,
       `${form.kycPassed}`,
       `${form.accreditedInvestor}`,
+      `${form.validityBlocks}u32`,
     ]
 
     const result = await executeTransition('issue_credential', inputs)
@@ -121,6 +139,42 @@ export default function Issue() {
         </p>
       </div>
 
+      {/* Issuer Status Banner */}
+      <div
+        className="brut-card-static p-4 mb-6 flex items-center gap-3"
+        style={{
+          background: checkingIssuer ? '#f3f4f6' : isAuthorizedIssuer ? 'var(--color-lime)' : 'var(--color-coral)',
+        }}
+      >
+        {checkingIssuer ? (
+          <>
+            <div className="w-5 h-5 rounded-full border-2 border-ink animate-spin" style={{ borderTopColor: 'transparent' }} />
+            <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+              Checking issuer authorization...
+            </span>
+          </>
+        ) : isAuthorizedIssuer ? (
+          <>
+            <ShieldCheck size={20} strokeWidth={2.5} />
+            <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>
+              You are an authorized issuer
+            </span>
+          </>
+        ) : (
+          <>
+            <ShieldX size={20} strokeWidth={2.5} />
+            <div>
+              <span className="text-sm font-semibold block" style={{ fontFamily: 'var(--font-heading)' }}>
+                Not an authorized issuer
+              </span>
+              <span className="text-xs" style={{ opacity: 0.8 }}>
+                Your transaction will be submitted but will fail on-chain. Contact the admin to get authorized.
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit}>
         <div className="brut-card-static bg-white p-6 sm:p-8 mb-6">
           <h3 className="text-lg font-bold mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -170,7 +224,7 @@ export default function Issue() {
           </div>
         </div>
 
-        <div className="brut-card-static bg-white p-6 sm:p-8 mb-8">
+        <div className="brut-card-static bg-white p-6 sm:p-8 mb-6">
           <h3 className="text-lg font-bold mb-6" style={{ fontFamily: 'var(--font-heading)' }}>Verification Status</h3>
           <div className="space-y-5">
             <div className="flex items-center justify-between">
@@ -198,13 +252,34 @@ export default function Issue() {
           </div>
         </div>
 
+        <div className="brut-card-static bg-white p-6 sm:p-8 mb-8">
+          <h3 className="text-lg font-bold mb-6" style={{ fontFamily: 'var(--font-heading)' }}>Credential Validity</h3>
+          <div>
+            <label className="block text-sm font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              Valid For
+            </label>
+            <select
+              className="brut-select"
+              value={form.validityBlocks}
+              onChange={e => setForm(f => ({ ...f, validityBlocks: parseInt(e.target.value) }))}
+            >
+              {VALIDITY_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+              Credentials expire after this period (measured in Aleo blocks). Expired credentials cannot generate proofs.
+            </p>
+          </div>
+        </div>
+
         <div className="brut-card-static p-6 mb-8" style={{ background: 'var(--color-sky)', opacity: 0.9 }}>
           <h4 className="font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>What happens?</h4>
           <ul className="text-sm space-y-1" style={{ opacity: 0.85 }}>
-            <li>1. Your Leo Wallet will prompt you to approve the transaction</li>
-            <li>2. A credential record is created on Aleo, encrypted with the owner's key</li>
-            <li>3. Only the owner can decrypt and read the credential data</li>
-            <li>4. The owner can generate proofs from this credential any number of times</li>
+            <li>1. Your wallet will prompt you to approve the transaction</li>
+            <li>2. The on-chain program verifies you are an authorized issuer</li>
+            <li>3. A credential record is created on Aleo, encrypted with the owner's key</li>
+            <li>4. Only the owner can decrypt and use the credential to generate proofs</li>
           </ul>
         </div>
 
