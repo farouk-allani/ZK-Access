@@ -1,32 +1,28 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useWallet, PROGRAM_ID } from '../context/WalletContext'
+import { useWallet, queryMapping } from '../context/WalletContext'
 import { COUNTRY_NAMES } from '../types'
-import { ShieldCheck, MapPin, User, ArrowRight, AlertTriangle, FileCheck, RefreshCw, ExternalLink } from 'lucide-react'
+import type { ParsedCredential } from '../types'
+import { ShieldCheck, MapPin, User, ArrowRight, AlertTriangle, FileCheck, RefreshCw, ExternalLink, Clock, Ban } from 'lucide-react'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
-
-interface ParsedCredential {
-  raw: Record<string, unknown>
-  owner: string
-  issuer: string
-  age: number
-  countryCode: number
-  kycPassed: boolean
-  accreditedInvestor: boolean
-}
 
 function parseRecord(record: Record<string, unknown>): ParsedCredential | null {
   try {
     const data = (record.data || record) as Record<string, string>
     const parseBool = (value: unknown) => String(value ?? '').toLowerCase().includes('true')
+    const parseNum = (value: unknown, suffix: string) => parseInt(String(value || '0').replace(suffix, '')) || 0
+
     return {
       raw: record,
       owner: String(data.owner || ''),
       issuer: String(data.issuer || ''),
-      age: parseInt(String(data.age || '0').replace('u8', '')) || 0,
-      countryCode: parseInt(String(data.country_code || '0').replace('u16', '')) || 0,
+      credentialId: String(data.credential_id || '0field').replace('field', ''),
+      age: parseNum(data.age, 'u8'),
+      countryCode: parseNum(data.country_code, 'u16'),
       kycPassed: parseBool(data.kyc_passed),
       accreditedInvestor: parseBool(data.accredited_investor),
+      issuedAt: parseNum(data.issued_at, 'u32'),
+      expiresAt: parseNum(data.expires_at, 'u32'),
     }
   } catch {
     return null
@@ -46,7 +42,7 @@ function isCredentialRecord(record: Record<string, unknown>): boolean {
     .toLowerCase()
 
   if (marker) {
-    return marker.includes('credential') && !marker.includes('proof')
+    return marker.includes('credential') && !marker.includes('access') && !marker.includes('token')
   }
 
   const data = (record.data || record) as Record<string, unknown>
@@ -63,8 +59,31 @@ function isCredentialRecord(record: Record<string, unknown>): boolean {
 export default function Credentials() {
   const { connected, getRecords, transactions } = useWallet()
   const [records, setRecords] = useState<ParsedCredential[]>([])
+  const [revokedMap, setRevokedMap] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
   const [fetched, setFetched] = useState(false)
+  const [currentBlock, setCurrentBlock] = useState<number | null>(null)
+
+  const fetchCurrentBlock = async () => {
+    try {
+      const res = await fetch('https://api.explorer.provable.com/v1/testnet/block/height/latest')
+      if (res.ok) {
+        const height = parseInt(await res.text())
+        if (!isNaN(height)) setCurrentBlock(height)
+      }
+    } catch { /* ignore */ }
+  }
+
+  const checkRevocation = async (credentials: ParsedCredential[]) => {
+    const map: Record<string, boolean> = {}
+    for (const cred of credentials) {
+      if (cred.credentialId && cred.credentialId !== '0') {
+        const result = await queryMapping('revoked_credentials', `${cred.credentialId}field`)
+        map[cred.credentialId] = result === 'true'
+      }
+    }
+    setRevokedMap(map)
+  }
 
   const fetchRecords = async () => {
     setLoading(true)
@@ -75,6 +94,7 @@ export default function Credentials() {
         .map(r => parseRecord(r as Record<string, unknown>))
         .filter((c): c is ParsedCredential => c !== null)
       setRecords(credentials)
+      checkRevocation(credentials)
     } catch {
       setRecords([])
     }
@@ -83,8 +103,18 @@ export default function Credentials() {
   }
 
   useEffect(() => {
-    if (connected) fetchRecords()
+    if (connected) {
+      fetchRecords()
+      fetchCurrentBlock()
+    }
   }, [connected])
+
+  const isExpired = (cred: ParsedCredential) => {
+    if (!currentBlock || !cred.expiresAt) return false
+    return currentBlock > cred.expiresAt
+  }
+
+  const isRevoked = (cred: ParsedCredential) => revokedMap[cred.credentialId] === true
 
   const recentIssueTxs = transactions.filter(t => t.functionName === 'issue_credential').slice(0, 5)
 
@@ -114,7 +144,7 @@ export default function Credentials() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={fetchRecords}
+            onClick={() => { fetchRecords(); fetchCurrentBlock() }}
             disabled={loading}
             className={`brut-btn ${loading ? 'brut-pulse' : ''}`}
             style={{ background: 'white' }}
@@ -130,54 +160,100 @@ export default function Credentials() {
 
       {records.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-6">
-          {records.map((cred, i) => (
-            <div key={i} className="brut-card-static bg-white overflow-hidden">
-              <div className="p-4 flex items-center justify-between" style={{ background: 'var(--color-purple)', borderBottom: '3px solid var(--color-ink)' }}>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={20} strokeWidth={2.5} />
-                  <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Credential</span>
-                </div>
-                <span className="brut-badge" style={{ background: 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>
-                  {PROGRAM_ID}
-                </span>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
+          {records.map((cred, i) => {
+            const expired = isExpired(cred)
+            const revoked = isRevoked(cred)
+            const statusColor = revoked ? 'var(--color-coral)' : expired ? 'var(--color-amber)' : 'var(--color-lime)'
+            const statusLabel = revoked ? 'REVOKED' : expired ? 'EXPIRED' : 'ACTIVE'
+
+            return (
+              <div key={i} className="brut-card-static bg-white overflow-hidden" style={{ opacity: revoked ? 0.6 : 1 }}>
+                <div className="p-4 flex items-center justify-between" style={{ background: 'var(--color-purple)', borderBottom: '3px solid var(--color-ink)' }}>
                   <div className="flex items-center gap-2">
-                    <User size={16} strokeWidth={2.5} style={{ color: '#6b7280' }} />
-                    <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Age</span>
+                    <ShieldCheck size={20} strokeWidth={2.5} />
+                    <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>Credential</span>
                   </div>
-                  <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{cred.age}</span>
+                  <span className="brut-badge" style={{ background: statusColor, fontSize: '0.7rem' }}>
+                    {statusLabel}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin size={16} strokeWidth={2.5} style={{ color: '#6b7280' }} />
-                    <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Country</span>
+                <div className="p-6 space-y-4">
+                  {/* Credential ID */}
+                  {cred.credentialId && cred.credentialId !== '0' && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium" style={{ color: '#6b7280' }}>ID</span>
+                      <span className="text-xs font-mono" style={{ color: '#6b7280' }}>
+                        {cred.credentialId.length > 16 ? `${cred.credentialId.slice(0, 8)}...${cred.credentialId.slice(-8)}` : cred.credentialId}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <User size={16} strokeWidth={2.5} style={{ color: '#6b7280' }} />
+                      <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Age</span>
+                    </div>
+                    <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{cred.age}</span>
                   </div>
-                  <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
-                    {COUNTRY_NAMES[cred.countryCode] || cred.countryCode}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={16} strokeWidth={2.5} style={{ color: '#6b7280' }} />
+                      <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Country</span>
+                    </div>
+                    <span className="font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+                      {COUNTRY_NAMES[cred.countryCode] || cred.countryCode}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: '#6b7280' }}>KYC Verified</span>
+                    <span className="brut-badge text-xs" style={{ background: cred.kycPassed ? 'var(--color-lime)' : 'var(--color-coral)' }}>
+                      {cred.kycPassed ? 'PASSED' : 'FAILED'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Accredited Investor</span>
+                    <span className="brut-badge text-xs" style={{ background: cred.accreditedInvestor ? 'var(--color-lime)' : '#e5e7eb' }}>
+                      {cred.accreditedInvestor ? 'YES' : 'NO'}
+                    </span>
+                  </div>
+                  {/* Expiration */}
+                  {cred.expiresAt > 0 && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock size={16} strokeWidth={2.5} style={{ color: '#6b7280' }} />
+                        <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Expires</span>
+                      </div>
+                      <span className="text-xs font-mono" style={{ color: expired ? 'var(--color-coral)' : '#6b7280' }}>
+                        Block #{cred.expiresAt.toLocaleString()}
+                        {currentBlock && !expired && ` (~${Math.max(0, cred.expiresAt - currentBlock).toLocaleString()} blocks left)`}
+                      </span>
+                    </div>
+                  )}
+                  {/* Revocation warning */}
+                  {revoked && (
+                    <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: '#fef2f2', border: '2px solid var(--color-coral)' }}>
+                      <Ban size={16} style={{ color: 'var(--color-coral)' }} />
+                      <span className="text-xs font-semibold" style={{ color: 'var(--color-coral)' }}>
+                        This credential has been revoked and can no longer generate proofs.
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium" style={{ color: '#6b7280' }}>KYC Verified</span>
-                  <span className="brut-badge text-xs" style={{ background: cred.kycPassed ? 'var(--color-lime)' : 'var(--color-coral)' }}>
-                    {cred.kycPassed ? 'PASSED' : 'FAILED'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium" style={{ color: '#6b7280' }}>Accredited Investor</span>
-                  <span className="brut-badge text-xs" style={{ background: cred.accreditedInvestor ? 'var(--color-lime)' : '#e5e7eb' }}>
-                    {cred.accreditedInvestor ? 'YES' : 'NO'}
-                  </span>
+                <div className="px-6 pb-6">
+                  <Link
+                    to="/prove"
+                    className="brut-btn w-full"
+                    style={{
+                      background: revoked || expired ? '#e5e7eb' : 'var(--color-lime)',
+                      pointerEvents: revoked || expired ? 'none' : 'auto',
+                      color: revoked || expired ? '#9ca3af' : 'var(--color-ink)',
+                    }}
+                  >
+                    {revoked ? 'Revoked' : expired ? 'Expired' : <>Generate Proof <ArrowRight size={16} strokeWidth={2.5} /></>}
+                  </Link>
                 </div>
               </div>
-              <div className="px-6 pb-6">
-                <Link to="/prove" className="brut-btn w-full" style={{ background: 'var(--color-lime)' }}>
-                  Generate Proof <ArrowRight size={16} strokeWidth={2.5} />
-                </Link>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : fetched ? (
         <div className="space-y-6">
@@ -209,15 +285,17 @@ export default function Credentials() {
                       <p className="text-xs font-mono" style={{ wordBreak: 'break-all' }}>{tx.id.slice(0, 24)}...</p>
                       <p className="text-xs" style={{ color: '#9ca3af' }}>{new Date(tx.timestamp).toLocaleString()}</p>
                     </div>
-                    <a
-                      href={`https://testnet.aleoscan.io/transaction?id=${tx.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="brut-btn text-xs"
-                      style={{ background: 'var(--color-sky)', padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
-                    >
-                      <ExternalLink size={12} />
-                    </a>
+                    {tx.explorerId && (
+                      <a
+                        href={`https://testnet.aleoscan.io/transaction?id=${tx.explorerId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="brut-btn text-xs"
+                        style={{ background: 'var(--color-sky)', padding: '0.3rem 0.6rem', fontSize: '0.7rem' }}
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>

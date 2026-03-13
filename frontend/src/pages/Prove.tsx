@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useWallet } from '../context/WalletContext'
-import { Zap, ArrowRight, AlertTriangle, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react'
-import type { ProofType } from '../types'
+import { useWallet, queryMapping } from '../context/WalletContext'
+import { Zap, ArrowRight, AlertTriangle, CheckCircle, ExternalLink, RefreshCw, Lock } from 'lucide-react'
+import type { ProofType, GateConfig } from '../types'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const PROOF_TYPES: { value: ProofType; label: string; desc: string; color: string; fn: string }[] = [
-  { value: 'age', label: 'Age Minimum', desc: 'Prove you meet a minimum age requirement', color: 'var(--color-coral)', fn: 'prove_age' },
-  { value: 'kyc', label: 'KYC Status', desc: 'Prove your identity has been KYC verified', color: 'var(--color-purple)', fn: 'prove_kyc' },
-  { value: 'country', label: 'Country Check', desc: 'Prove you are not in a restricted country', color: 'var(--color-sky)', fn: 'prove_country' },
-  { value: 'accredited', label: 'Accredited Investor', desc: 'Prove accredited investor status', color: 'var(--color-amber)', fn: 'prove_accredited' },
+  { value: 'age', label: 'Age Minimum', desc: 'Prove you meet a minimum age requirement', color: 'var(--color-coral)', fn: 'prove_single' },
+  { value: 'kyc', label: 'KYC Status', desc: 'Prove your identity has been KYC verified', color: 'var(--color-purple)', fn: 'prove_single' },
+  { value: 'country', label: 'Country Check', desc: 'Prove you are not in a restricted country', color: 'var(--color-sky)', fn: 'prove_single' },
+  { value: 'accredited', label: 'Accredited Investor', desc: 'Prove accredited investor status', color: 'var(--color-amber)', fn: 'prove_single' },
+  { value: 'gate', label: 'ZK-Gate Access', desc: 'Prove you meet all requirements of an access gate', color: 'var(--color-mint)', fn: 'pass_gate' },
 ]
+
+const CLAIM_TYPE_MAP: Record<string, number> = {
+  age: 1,
+  kyc: 2,
+  country: 3,
+  accredited: 4,
+}
 
 function isCredentialRecord(record: Record<string, unknown>): boolean {
   const candidates = [
@@ -25,7 +33,7 @@ function isCredentialRecord(record: Record<string, unknown>): boolean {
     .toLowerCase()
 
   if (marker) {
-    return marker.includes('credential') && !marker.includes('proof')
+    return marker.includes('credential') && !marker.includes('access') && !marker.includes('token')
   }
 
   const data = (record.data || record) as Record<string, unknown>
@@ -78,7 +86,6 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
     if (typeof resolved === 'string') {
       const trimmed = resolved.trim()
       if (!trimmed) return ''
-
       if (fallbackSuffix && /^\d+$/.test(trimmed)) {
         return `${trimmed}${fallbackSuffix}`
       }
@@ -104,18 +111,10 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
   }
 
   const getField = (source: Record<string, unknown>, key: string): unknown => {
-    const variants = [
-      key,
-      `${key}.private`,
-      `${key}.public`,
-      `${key}_private`,
-      `${key}_public`,
-    ]
-
+    const variants = [key, `${key}.private`, `${key}.public`, `${key}_private`, `${key}_public`]
     for (const variant of variants) {
       if (variant in source) return source[variant]
     }
-
     const nested = source.data
     if (nested && typeof nested === 'object') {
       const nestedSource = nested as Record<string, unknown>
@@ -123,7 +122,6 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
         if (variant in nestedSource) return nestedSource[variant]
       }
     }
-
     return undefined
   }
 
@@ -146,10 +144,13 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
   const ownerRaw = toAleoLiteral(getField(data, 'owner') ?? getField(source, 'owner'))
   const owner = ensureVisibility(ownerRaw, 'private')
   const issuer = ensureVisibility(toAleoLiteral(getField(data, 'issuer') ?? getField(source, 'issuer')), 'private')
+  const credentialId = toAleoLiteral(getField(data, 'credential_id') ?? getField(source, 'credential_id'), 'field')
   const age = toAleoLiteral(getField(data, 'age') ?? getField(source, 'age'), 'u8')
   const countryCode = toAleoLiteral(getField(data, 'country_code') ?? getField(source, 'country_code'), 'u16')
   const kycPassed = toAleoLiteral(getField(data, 'kyc_passed') ?? getField(source, 'kyc_passed'))
   const accreditedInvestor = toAleoLiteral(getField(data, 'accredited_investor') ?? getField(source, 'accredited_investor'))
+  const issuedAt = toAleoLiteral(getField(data, 'issued_at') ?? getField(source, 'issued_at'), 'u32')
+  const expiresAt = toAleoLiteral(getField(data, 'expires_at') ?? getField(source, 'expires_at'), 'u32')
   const nonce = toAleoLiteral(
     getField(data, '_nonce')
       ?? getField(data, 'nonce')
@@ -162,13 +163,20 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
   }
 
   const nonceSegment = nonce ? `, _nonce: ${nonce}` : ''
-  return `{ owner: ${owner}, issuer: ${issuer}, age: ${age}, country_code: ${countryCode}, kyc_passed: ${kycPassed}, accredited_investor: ${accreditedInvestor}${nonceSegment} }`
+  const credIdSegment = credentialId ? `, credential_id: ${credentialId}` : ''
+  const issuedSegment = issuedAt ? `, issued_at: ${issuedAt}` : ''
+  const expiresSegment = expiresAt ? `, expires_at: ${expiresAt}` : ''
+
+  return `{ owner: ${owner}, issuer: ${issuer}${credIdSegment}, age: ${age}, country_code: ${countryCode}, kyc_passed: ${kycPassed}, accredited_investor: ${accreditedInvestor}${issuedSegment}${expiresSegment}${nonceSegment} }`
 }
 
 export default function Prove() {
   const { connected, getRecords, executeTransition, addToast } = useWallet()
   const [proofType, setProofType] = useState<ProofType>('age')
   const [minimumAge, setMinimumAge] = useState(18)
+  const [gateId, setGateId] = useState('')
+  const [gateConfig, setGateConfig] = useState<GateConfig | null>(null)
+  const [loadingGate, setLoadingGate] = useState(false)
   const [loading, setLoading] = useState(false)
   const [txId, setTxId] = useState<string | null>(null)
   const [explorerTxId, setExplorerTxId] = useState<string | null>(null)
@@ -195,6 +203,36 @@ export default function Prove() {
     if (connected) fetchRecords()
   }, [connected])
 
+  const fetchGateConfig = async () => {
+    if (!gateId.trim()) return
+    setLoadingGate(true)
+    setGateConfig(null)
+    try {
+      const gateKey = gateId.trim().endsWith('field') ? gateId.trim() : `${gateId.trim()}field`
+      const result = await queryMapping('gates', gateKey)
+      if (result) {
+        const cleaned = result.replace(/\s/g, '')
+        const getVal = (key: string) => {
+          const match = cleaned.match(new RegExp(`${key}:([^,}]+)`))
+          return match ? match[1].trim() : ''
+        }
+        setGateConfig({
+          gateId: gateId.trim(),
+          minAge: parseInt(getVal('min_age').replace('u8', '')) || 0,
+          requireKyc: getVal('require_kyc') === 'true',
+          requireNotRestricted: getVal('require_not_restricted') === 'true',
+          requireAccredited: getVal('require_accredited') === 'true',
+          active: getVal('active') !== 'false',
+        })
+      } else {
+        addToast('Gate not found', 'error')
+      }
+    } catch {
+      addToast('Failed to fetch gate config', 'error')
+    }
+    setLoadingGate(false)
+  }
+
   const handleGenerate = async () => {
     if (selectedRecord < 0 || !records[selectedRecord]) {
       addToast('Please select a credential record', 'error')
@@ -214,11 +252,28 @@ export default function Prove() {
       setLoading(false)
       return
     }
+
     let inputs: string[]
-    if (proofType === 'age') {
-      inputs = [recordStr, `${minimumAge}u8`]
+
+    if (proofType === 'gate') {
+      if (!gateConfig) {
+        addToast('Please look up a gate first', 'error')
+        setLoading(false)
+        return
+      }
+      const gateField = gateConfig.gateId.endsWith('field') ? gateConfig.gateId : `${gateConfig.gateId}field`
+      inputs = [
+        recordStr,
+        gateField,
+        `${gateConfig.minAge}u8`,
+        `${gateConfig.requireKyc}`,
+        `${gateConfig.requireNotRestricted}`,
+        `${gateConfig.requireAccredited}`,
+      ]
     } else {
-      inputs = [recordStr]
+      const claimType = CLAIM_TYPE_MAP[proofType] || 1
+      const minAge = proofType === 'age' ? minimumAge : 0
+      inputs = [recordStr, `${claimType}u8`, `${minAge}u8`]
     }
 
     const result = await executeTransition(proofConfig.fn, inputs)
@@ -247,11 +302,13 @@ export default function Prove() {
           <div className="p-8 text-center">
             <CheckCircle size={56} strokeWidth={2.5} className="mx-auto mb-4" />
             <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-              Proof Submitted!
+              {proofType === 'gate' ? 'Gate Passed!' : 'Proof Submitted!'}
             </h3>
             <p className="text-sm mb-6" style={{ opacity: 0.8 }}>
               Your proof transaction has been submitted to the Aleo network.
-              The credential has been consumed and a new instance returned to your wallet.
+              {proofType === 'gate'
+                ? ' Your access has been recorded on-chain for third-party verification.'
+                : ' The credential has been consumed and a new instance returned to your wallet.'}
             </p>
             {explorerTxId ? (
               <a
@@ -280,7 +337,7 @@ export default function Prove() {
                 Generate Another Proof
               </button>
               <Link to="/verify" className="brut-btn" style={{ background: 'var(--color-amber)' }}>
-                View Activity <ArrowRight size={16} strokeWidth={2.5} />
+                Verify Proof <ArrowRight size={16} strokeWidth={2.5} />
               </Link>
             </div>
           </div>
@@ -337,27 +394,6 @@ export default function Prove() {
                 </div>
               </button>
             ))}
-
-            {/* {import.meta.env.DEV && selectedRecordDebug && (
-              <div className="rounded-xl p-4 mt-2" style={{ border: '2px dashed var(--color-ink)', background: '#f9fafb' }}>
-                <div className="font-bold text-xs mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Selected Record Debug (DEV only)
-                </div>
-                <pre className="text-xs overflow-auto" style={{ maxHeight: '240px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {selectedRecordDebug}
-                </pre>
-                <div className="font-bold text-xs mt-3 mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Computed Input Sent To Wallet (DEV only)
-                </div>
-                <pre className="text-xs overflow-auto" style={{ maxHeight: '200px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {typeof selectedRecordInputDebug === 'string'
-                    ? selectedRecordInputDebug
-                    : selectedRecordInputDebug === null
-                      ? 'null'
-                      : JSON.stringify(selectedRecordInputDebug, null, 2)}
-                </pre>
-              </div>
-            )} */}
           </div>
         ) : (
           <div className="text-center py-6">
@@ -391,12 +427,16 @@ export default function Prove() {
                 background: proofType === pt.value ? pt.color : 'white',
               }}
             >
-              <div className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)' }}>{pt.label}</div>
+              <div className="font-bold text-sm flex items-center gap-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                {pt.value === 'gate' && <Lock size={14} />}
+                {pt.label}
+              </div>
               <div className="text-xs mt-1" style={{ opacity: 0.7 }}>{pt.desc}</div>
             </button>
           ))}
         </div>
 
+        {/* Age minimum input */}
         {proofType === 'age' && (
           <div className="mt-5">
             <label className="block text-sm font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
@@ -413,29 +453,98 @@ export default function Prove() {
             />
           </div>
         )}
+
+        {/* Gate ID input */}
+        {proofType === 'gate' && (
+          <div className="mt-5 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                Gate ID
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="brut-input flex-1"
+                  placeholder="Enter gate ID (field value)"
+                  value={gateId}
+                  onChange={e => setGateId(e.target.value)}
+                />
+                <button
+                  onClick={fetchGateConfig}
+                  disabled={loadingGate || !gateId.trim()}
+                  className="brut-btn"
+                  style={{ background: loadingGate ? '#d1d5db' : 'var(--color-sky)', whiteSpace: 'nowrap' }}
+                >
+                  {loadingGate ? 'Looking up...' : 'Look Up'}
+                </button>
+              </div>
+              <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+                Get gate IDs from the <Link to="/gates" className="underline" style={{ color: 'var(--color-purple)' }}>Gates</Link> page
+              </p>
+            </div>
+
+            {gateConfig && (
+              <div className="p-4 rounded-xl" style={{ background: gateConfig.active ? 'var(--color-mint)' : '#fee2e2', border: '3px solid var(--color-ink)' }}>
+                <h4 className="font-bold text-sm mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
+                  Gate Requirements
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {gateConfig.minAge > 0 && (
+                    <span className="brut-badge text-xs" style={{ background: 'var(--color-coral)' }}>
+                      Age {'>'}= {gateConfig.minAge}
+                    </span>
+                  )}
+                  {gateConfig.requireKyc && (
+                    <span className="brut-badge text-xs" style={{ background: 'var(--color-purple)', color: 'white' }}>
+                      KYC Required
+                    </span>
+                  )}
+                  {gateConfig.requireNotRestricted && (
+                    <span className="brut-badge text-xs" style={{ background: 'var(--color-sky)' }}>
+                      Country Check
+                    </span>
+                  )}
+                  {gateConfig.requireAccredited && (
+                    <span className="brut-badge text-xs" style={{ background: 'var(--color-amber)' }}>
+                      Accredited Investor
+                    </span>
+                  )}
+                  {!gateConfig.minAge && !gateConfig.requireKyc && !gateConfig.requireNotRestricted && !gateConfig.requireAccredited && (
+                    <span className="text-xs" style={{ color: '#6b7280' }}>No requirements (open gate)</span>
+                  )}
+                </div>
+                {!gateConfig.active && (
+                  <p className="text-xs font-semibold mt-2" style={{ color: 'var(--color-coral)' }}>
+                    This gate is deactivated.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Info */}
       <div className="brut-card-static p-6 mb-6" style={{ background: 'var(--color-sky)', opacity: 0.9 }}>
         <h4 className="font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>What gets revealed?</h4>
         <div className="text-sm space-y-1" style={{ opacity: 0.85 }}>
-          <p><strong>Revealed:</strong> Boolean result (pass/fail) only</p>
+          <p><strong>Revealed:</strong> Boolean result (pass/fail) only{proofType === 'gate' && ' + proof recorded on-chain for verifiers'}</p>
           <p><strong>Hidden:</strong> Your age, country, identity, credential contents — everything else</p>
-          <p><strong>How:</strong> The credential record is consumed and a new instance is returned to you.</p>
+          <p><strong>How:</strong> The credential is consumed as a private input, a new instance is returned to you.</p>
         </div>
       </div>
 
       {/* Generate Button */}
       <button
         onClick={handleGenerate}
-        disabled={loading || records.length === 0}
+        disabled={loading || records.length === 0 || (proofType === 'gate' && !gateConfig)}
         className={`brut-btn brut-btn-lg w-full mb-8 ${loading ? 'brut-pulse' : ''}`}
         style={{
-          background: loading ? '#d1d5db' : records.length === 0 ? '#e5e7eb' : 'var(--color-purple)',
-          color: records.length === 0 ? '#9ca3af' : 'white',
+          background: loading ? '#d1d5db' : records.length === 0 ? '#e5e7eb' : proofType === 'gate' ? 'var(--color-mint)' : 'var(--color-purple)',
+          color: records.length === 0 ? '#9ca3af' : proofType === 'gate' ? 'var(--color-ink)' : 'white',
         }}
       >
-        {loading ? <>Submitting to Aleo...</> : <>Generate Proof <Zap size={20} strokeWidth={2.5} /></>}
+        {loading ? <>Submitting to Aleo...</> : proofType === 'gate' ? <>Pass Gate <Lock size={20} strokeWidth={2.5} /></> : <>Generate Proof <Zap size={20} strokeWidth={2.5} /></>}
       </button>
     </div>
   )

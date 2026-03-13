@@ -2,8 +2,12 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { useWallet as useAdapterWallet } from '@provablehq/aleo-wallet-adaptor-react'
 import type { Toast, TxRecord } from '../types'
 
-export const PROGRAM_ID = 'zkaccess_v2.aleo'
-const DEFAULT_FEE = 100_000
+export const PROGRAM_ID = 'zkaccess_v3.aleo'
+const DEFAULT_FEE = 500_000
+const ALEO_API = 'https://api.explorer.provable.com/v1/testnet'
+
+// Set this to the address that calls initialize_admin() after deployment.
+export const ADMIN_ADDRESS = '' // Will be set after deployment
 
 function isAleoExplorerTxId(value: string): boolean {
   return /^at1[a-z0-9]+$/i.test(value)
@@ -77,6 +81,24 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 10) + Date.now().toString(36)
 }
 
+// Query a public mapping value from the Aleo REST API.
+export async function queryMapping(
+  mappingName: string,
+  key: string,
+  programId: string = PROGRAM_ID,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${ALEO_API}/program/${programId}/mapping/${mappingName}/${key}`
+    )
+    if (!response.ok) return null
+    const value = await response.text()
+    return value.replace(/^"|"$/g, '').trim()
+  } catch {
+    return null
+  }
+}
+
 interface AppContextType {
   toasts: Toast[]
   addToast: (message: string, type: Toast['type']) => void
@@ -134,6 +156,9 @@ export function useApp() {
 export function useWallet() {
   const adapter = useAdapterWallet()
   const app = useApp()
+
+  const address = adapter.address || null
+  const isAdmin = !!(address && ADMIN_ADDRESS && address === ADMIN_ADDRESS)
 
   const executeTransition = useCallback(async (
     functionName: string,
@@ -230,9 +255,10 @@ export function useWallet() {
   }, [adapter.connected, adapter.requestRecords])
 
   return {
-    address: adapter.address || null,
+    address,
     connected: adapter.connected,
     connecting: adapter.connecting,
+    isAdmin,
 
     toasts: app.toasts,
     addToast: app.addToast,

@@ -1,36 +1,36 @@
 import { Link } from 'react-router-dom'
-import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, CheckCircle, Zap } from 'lucide-react'
+import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, CheckCircle, Zap, Search } from 'lucide-react'
 import { useWallet } from '../context/WalletContext'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const FEATURES = [
   {
     title: 'Issue Credentials',
-    desc: 'Issuers create encrypted credential records. Only the owner can decrypt and use them.',
+    desc: 'Authorized issuers create encrypted credential records with expiration. Only the owner can decrypt them.',
     color: 'var(--color-coral)',
     icon: FileCheck,
     link: '/issue',
   },
   {
+    title: 'ZK-Gated Access',
+    desc: 'Create access gates with custom requirements. Users prove eligibility without revealing personal data.',
+    color: 'var(--color-mint)',
+    icon: Lock,
+    link: '/gates',
+  },
+  {
     title: 'Prove Privately',
-    desc: 'Generate proofs that reveal only a boolean result. Your data stays hidden.',
+    desc: 'Generate proofs that reveal only pass/fail. Your age, country, and identity stay hidden.',
     color: 'var(--color-purple)',
     icon: Eye,
     link: '/prove',
   },
   {
     title: 'Verify On-Chain',
-    desc: 'Every proof is a real Aleo transaction. Verify it on AleoScan.',
+    desc: 'Third parties verify proofs from the on-chain registry. No trust required — just cryptography.',
     color: 'var(--color-lime)',
     icon: CheckCircle,
     link: '/verify',
-  },
-  {
-    title: 'Full Privacy',
-    desc: 'Powered by Aleo. Execution is local, records are encrypted, privacy is the default.',
-    color: 'var(--color-amber)',
-    icon: Lock,
-    link: '/',
   },
 ]
 
@@ -38,24 +38,30 @@ const STEPS = [
   {
     num: '01',
     title: 'Get a Credential',
-    desc: 'A trusted issuer creates an encrypted credential record in your wallet. It contains your claims (age, KYC status, country) but only you can see them.',
+    desc: 'An authorized issuer creates an encrypted credential in your wallet. It contains your claims (age, KYC, country) but only you can see them. Credentials have an expiration and can be revoked.',
     icon: Fingerprint,
     color: 'var(--color-sky)',
   },
   {
     num: '02',
-    title: 'Generate a Proof',
-    desc: 'Prove a claim like "I am 18+" without revealing your actual age. The credential is consumed and returned to you so you can reuse it.',
-    icon: Zap,
-    color: 'var(--color-purple)',
+    title: 'Pass a Gate',
+    desc: 'Services define access gates with requirements (18+, KYC, not restricted). You prove your credential meets them — all at once, privately. Your data never leaves your wallet.',
+    icon: Lock,
+    color: 'var(--color-mint)',
   },
   {
     num: '03',
-    title: 'Done — On-Chain',
-    desc: 'The transaction is recorded on the Aleo network. Anyone can verify the proof happened, but nobody can see your private data.',
+    title: 'Verified On-Chain',
+    desc: 'The proof is recorded on the Aleo network. Anyone can verify it happened, but nobody can see your private data. Composable, trustless, private.',
     icon: Shield,
-    color: 'var(--color-mint)',
+    color: 'var(--color-purple)',
   },
+]
+
+const STATS = [
+  { label: 'Transitions', value: '12' },
+  { label: 'Mappings', value: '7' },
+  { label: 'Privacy', value: '100%' },
 ]
 
 export default function Home() {
@@ -76,34 +82,43 @@ export default function Home() {
             className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            Prove Who You Are.
+            ZK-Gated Access
             <br />
-            <span style={{ color: 'var(--color-coral)' }}>Reveal Nothing.</span>
+            <span style={{ color: 'var(--color-coral)' }}>Control Protocol.</span>
           </h1>
           <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10" style={{ color: '#4b5563' }}>
-            Privacy-preserving identity verification on Aleo.
-            Issue credentials, generate zero-knowledge proofs, and verify claims —
+            Privacy-preserving access control on Aleo.
+            Issue credentials, create access gates, prove eligibility —
             without ever exposing personal data.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {connected ? (
               <Link
-                to="/issue"
+                to="/gates"
                 className="brut-btn brut-btn-lg"
                 style={{ background: 'var(--color-coral)', color: 'var(--color-ink)' }}
               >
-                Start Issuing <ArrowRight size={20} strokeWidth={2.5} />
+                Explore Gates <ArrowRight size={20} strokeWidth={2.5} />
               </Link>
             ) : (
               <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
             )}
             <Link
-              to="/credentials"
+              to="/prove"
               className="brut-btn brut-btn-lg"
               style={{ background: 'white' }}
             >
-              View Credentials
+              Generate Proof <Zap size={20} strokeWidth={2.5} />
             </Link>
+          </div>
+          {/* Stats */}
+          <div className="flex justify-center gap-6 mt-10">
+            {STATS.map(stat => (
+              <div key={stat.label} className="text-center">
+                <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)' }}>{stat.value}</div>
+                <div className="text-xs" style={{ color: '#6b7280' }}>{stat.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -123,18 +138,20 @@ export default function Home() {
         <div className="marquee-track flex items-center gap-8 whitespace-nowrap" style={{ width: 'max-content' }}>
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex items-center gap-8">
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ZERO KNOWLEDGE</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ZK-GATED ACCESS</span>
               <span style={{ color: 'var(--color-coral)' }}>&#9670;</span>
               <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>PRIVACY BY DEFAULT</span>
               <span style={{ color: 'var(--color-lime)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>SELECTIVE DISCLOSURE</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ACCESS CONTROL PROTOCOL</span>
               <span style={{ color: 'var(--color-amber)' }}>&#9670;</span>
               <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ALEO BLOCKCHAIN</span>
               <span style={{ color: 'var(--color-purple)' }}>&#9670;</span>
               <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ENCRYPTED RECORDS</span>
               <span style={{ color: 'var(--color-sky)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>LOCAL EXECUTION</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>7 MAPPINGS</span>
               <span style={{ color: 'var(--color-pink)' }}>&#9670;</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>12 TRANSITIONS</span>
+              <span style={{ color: 'var(--color-mint)' }}>&#9670;</span>
             </div>
           ))}
         </div>
@@ -143,10 +160,10 @@ export default function Home() {
       {/* Features Bento Grid */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
-          How It Works
+          What You Can Do
         </h2>
         <p className="text-center mb-12" style={{ color: '#6b7280', maxWidth: '600px', margin: '0 auto 3rem' }}>
-          One credential. Unlimited proofs. Complete privacy.
+          A complete access control protocol. Issue, gate, prove, verify — all with zero knowledge.
         </p>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {FEATURES.map((feat) => {
@@ -218,6 +235,26 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Use Cases */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-12" style={{ fontFamily: 'var(--font-heading)' }}>
+          Use Cases
+        </h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            { title: 'DeFi Access Control', desc: 'Lending protocols require accredited investors. Users prove eligibility privately — no KYC documents shared.', icon: Shield, color: 'var(--color-coral)' },
+            { title: 'Token-Gated Content', desc: 'Gate premium content behind age verification or membership proofs. Users prove access rights without doxxing.', icon: Lock, color: 'var(--color-amber)' },
+            { title: 'Compliance Without Exposure', desc: 'Meet regulatory requirements through selective disclosure. Prove jurisdiction compliance without revealing location.', icon: Search, color: 'var(--color-sky)' },
+          ].map(uc => (
+            <div key={uc.title} className="brut-card-static bg-white p-6">
+              <uc.icon size={28} strokeWidth={2.5} style={{ color: uc.color }} className="mb-3" />
+              <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>{uc.title}</h3>
+              <p className="text-sm" style={{ color: '#6b7280' }}>{uc.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section
         className="mx-4 sm:mx-8 mb-12 rounded-3xl overflow-hidden"
@@ -234,16 +271,16 @@ export default function Home() {
             Ready to prove without revealing?
           </h2>
           <p className="mb-8" style={{ color: '#9ca3af', maxWidth: '500px', margin: '0 auto 2rem' }}>
-            Connect your Leo Wallet and experience zero-knowledge identity verification on Aleo.
+            Connect your wallet and experience zero-knowledge access control on Aleo.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {connected ? (
               <Link
-                to="/credentials"
+                to="/gates"
                 className="brut-btn brut-btn-lg"
                 style={{ background: 'var(--color-coral)', color: 'var(--color-ink)' }}
               >
-                View My Credentials <ArrowRight size={20} strokeWidth={2.5} />
+                Create a Gate <Lock size={20} strokeWidth={2.5} />
               </Link>
             ) : (
               <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />

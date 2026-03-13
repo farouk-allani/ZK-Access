@@ -1,6 +1,6 @@
 {
-  "program": "zkaccess_v2.aleo",
+  "program": "zkaccess_v3.aleo",
   "version": "0.1.0",
-  "description": "ZK-Access: Simple privacy-preserving credentials on Aleo",
+  "description": "ZK-Access: Privacy-Preserving ZK-Gated Access Control Protocol on Aleo",
   "license": "MIT"
 }
