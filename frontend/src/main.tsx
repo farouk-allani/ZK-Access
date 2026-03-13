@@ -8,9 +8,10 @@ import { Network } from '@provablehq/aleo-types'
 import '@provablehq/aleo-wallet-adaptor-react-ui/dist/styles.css'
 import './index.css'
 import App from './App'
-import { LeoWalletAdapter } from './adapters/LeoWalletAdapter'
+import { LeoWalletAdapter } from '@provablehq/aleo-wallet-adaptor-leo'
+import { ShieldWalletAdapter } from '@provablehq/aleo-wallet-adaptor-shield'
 
-const wallets = [new LeoWalletAdapter()]
+const wallets = [new ShieldWalletAdapter(), new LeoWalletAdapter()]
 
 function Root() {
   return (
