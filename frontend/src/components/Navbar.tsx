@@ -5,7 +5,7 @@ import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 import { useWallet } from '../context/WalletContext'
 
 export default function Navbar() {
-  const { connected, address, isAdmin } = useWallet()
+  const { connected, address } = useWallet()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -16,7 +16,7 @@ export default function Navbar() {
     { to: '/prove', label: 'Prove' },
     { to: '/gates', label: 'Gates' },
     { to: '/verify', label: 'Verify' },
-    ...(isAdmin ? [{ to: '/admin', label: 'Admin' }] : []),
+    { to: '/admin', label: 'Admin' },
   ]
 
   return (

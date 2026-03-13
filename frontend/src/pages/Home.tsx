@@ -1,6 +1,7 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, CheckCircle, Zap, Search } from 'lucide-react'
-import { useWallet } from '../context/WalletContext'
+import { queryMapping, useWallet } from '../context/WalletContext'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const FEATURES = [
@@ -65,7 +66,32 @@ const STATS = [
 ]
 
 export default function Home() {
-  const { connected } = useWallet()
+  const { connected, address, isAdmin, adminChecked } = useWallet()
+  const [preflightLoading, setPreflightLoading] = useState(false)
+  const [adminInitialized, setAdminInitialized] = useState<boolean | null>(null)
+  const [issuerAuthorized, setIssuerAuthorized] = useState<boolean | null>(null)
+  const [gateCounter, setGateCounter] = useState<string | null>(null)
+
+  const runPreflightChecks = useCallback(async () => {
+    setPreflightLoading(true)
+    try {
+      const [adminValue, gateCount, issuerValue] = await Promise.all([
+        queryMapping('admin', '0u8'),
+        queryMapping('gate_counter', '0u8'),
+        address ? queryMapping('authorized_issuers', address) : Promise.resolve(null),
+      ])
+
+      setAdminInitialized(!!adminValue)
+      setGateCounter(gateCount)
+      setIssuerAuthorized(address ? issuerValue === 'true' : null)
+    } finally {
+      setPreflightLoading(false)
+    }
+  }, [address])
+
+  useEffect(() => {
+    runPreflightChecks()
+  }, [runPreflightChecks])
 
   return (
     <div className="page-enter">
@@ -119,6 +145,61 @@ export default function Home() {
                 <div className="text-xs" style={{ color: '#6b7280' }}>{stat.label}</div>
               </div>
             ))}
+          </div>
+
+          <div className="brut-card-static bg-white max-w-3xl mx-auto mt-10 p-5 text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--font-heading)' }}>
+                Judge Preflight Checks
+              </h3>
+              <button
+                type="button"
+                onClick={runPreflightChecks}
+                disabled={preflightLoading}
+                className="brut-btn"
+                style={{ background: preflightLoading ? '#d1d5db' : 'var(--color-sky)', fontSize: '0.8rem' }}
+              >
+                {preflightLoading ? 'Checking...' : 'Refresh Checks'}
+              </button>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="p-3 rounded-xl" style={{ border: '2px solid var(--color-ink)', background: connected ? 'var(--color-lime)' : '#fee2e2' }}>
+                <div className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Wallet Connected</div>
+                <div>{connected && address ? `${address.slice(0, 10)}...${address.slice(-6)}` : 'Connect wallet'}</div>
+              </div>
+
+              <div className="p-3 rounded-xl" style={{ border: '2px solid var(--color-ink)', background: adminInitialized ? 'var(--color-lime)' : '#fee2e2' }}>
+                <div className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Admin Initialized</div>
+                <div>
+                  {preflightLoading ? 'Checking...' : adminInitialized ? 'Yes' : 'No (run initialize_admin)'}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl" style={{ border: '2px solid var(--color-ink)', background: issuerAuthorized ? 'var(--color-lime)' : '#fee2e2' }}>
+                <div className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Your Issuer Status</div>
+                <div>
+                  {!connected
+                    ? 'Connect wallet to check'
+                    : preflightLoading
+                      ? 'Checking...'
+                      : issuerAuthorized
+                        ? 'Authorized issuer'
+                        : 'Not authorized (register_issuer)'}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl" style={{ border: '2px solid var(--color-ink)', background: 'var(--color-cream)' }}>
+                <div className="font-semibold" style={{ fontFamily: 'var(--font-heading)' }}>Gates Created</div>
+                <div>{preflightLoading ? 'Checking...' : gateCounter ?? '0u64'}</div>
+              </div>
+            </div>
+
+            <p className="text-xs mt-3" style={{ color: '#6b7280' }}>
+              Admin UI visibility is now derived from on-chain admin mapping.
+              {adminChecked ? ' Navbar status is synced.' : ' Syncing admin status...'}
+              {!isAdmin && connected ? ' If this wallet should be admin, switch to the admin wallet.' : ''}
+            </p>
           </div>
         </div>
       </section>

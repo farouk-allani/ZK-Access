@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { useWallet as useAdapterWallet } from '@provablehq/aleo-wallet-adaptor-react'
 import type { Toast, TxRecord } from '../types'
 
@@ -158,7 +158,31 @@ export function useWallet() {
   const app = useApp()
 
   const address = adapter.address || null
-  const isAdmin = !!(address && ADMIN_ADDRESS && address === ADMIN_ADDRESS)
+  const [adminAddress, setAdminAddress] = useState<string | null>(null)
+  const [adminChecked, setAdminChecked] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadAdminAddress = async () => {
+      setAdminChecked(false)
+      const onChainAdmin = await queryMapping('admin', '0u8')
+      if (cancelled) return
+
+      // Prefer on-chain source of truth; fall back to hardcoded value for local testing.
+      const fallbackAdmin = ADMIN_ADDRESS.trim() ? ADMIN_ADDRESS : null
+      setAdminAddress(onChainAdmin ?? fallbackAdmin)
+      setAdminChecked(true)
+    }
+
+    loadAdminAddress()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const isAdmin = !!(address && adminAddress && address === adminAddress)
 
   const executeTransition = useCallback(async (
     functionName: string,
@@ -259,6 +283,8 @@ export function useWallet() {
     connected: adapter.connected,
     connecting: adapter.connecting,
     isAdmin,
+    adminAddress,
+    adminChecked,
 
     toasts: app.toasts,
     addToast: app.addToast,
