@@ -166,6 +166,34 @@ The `pass_gate` transition demonstrates Aleo's privacy model at its best:
 
 Every action is a real Aleo transaction with async finalization. No mocks.
 
+## Judge Quick Test (5-7 Minutes)
+
+Use this exact sequence to validate the app end-to-end.
+
+1. Connect wallet on testnet and confirm the Home page preflight card shows Wallet Connected.
+2. Open Admin and click Initialize Admin once (skip if already initialized).
+3. In Admin, register the connected address as issuer using Register Issuer.
+4. Return to Home and click Refresh Checks in Judge Preflight Checks.
+5. Confirm Admin Initialized is Yes and Your Issuer Status is Authorized issuer.
+6. Open Issue and submit a credential to your own address.
+7. Open Gates and create a gate (for example min age 18 + KYC required).
+8. Open Credentials and confirm you can see your newly issued credential record.
+9. Open Prove and run pass_gate with your credential and gate settings.
+10. Open Verify and check proof existence for your address.
+
+Expected outcomes:
+
+- Issue should submit without the Not an authorized issuer warning.
+- pass_gate should succeed when the credential satisfies gate conditions.
+- Verify should show proof activity for the subject address.
+
+If a judge gets stuck:
+
+1. Use Home -> Judge Preflight Checks -> Refresh Checks.
+2. Ensure the same wallet address is both connected and registered as issuer.
+3. Wait 10-30 seconds for explorer indexing, then refresh the page.
+4. Confirm testnet endpoint is reachable: https://api.explorer.provable.com/v1/testnet
+
 ---
 
 ## Run Locally
