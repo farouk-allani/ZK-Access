@@ -1,14 +1,30 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { useWallet, queryMapping } from '../context/WalletContext'
+import { useWallet, queryMapping, ALEO_API } from '../context/WalletContext'
 import { COUNTRY_NAMES } from '../types'
 import type { ParsedCredential } from '../types'
 import { ShieldCheck, MapPin, User, ArrowRight, AlertTriangle, FileCheck, RefreshCw, ExternalLink, Clock, Ban } from 'lucide-react'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
+function parsePlaintext(plaintext: string): Record<string, string> {
+  const fields: Record<string, string> = {}
+  // Match "key: value.private" or "key: value.public" lines in Aleo record plaintext
+  const regex = /(\w+):\s*(.+?)\.(?:private|public)/g
+  let match
+  while ((match = regex.exec(plaintext)) !== null) {
+    fields[match[1]] = match[2].trim()
+  }
+  return fields
+}
+
 function parseRecord(record: Record<string, unknown>): ParsedCredential | null {
   try {
-    const data = (record.data || record) as Record<string, string>
+    // Shield wallet returns data in recordPlaintext string; other adapters use data object
+    const plaintext = record.recordPlaintext as string | undefined
+    const data = plaintext
+      ? parsePlaintext(plaintext)
+      : (record.data || record) as Record<string, string>
+
     const parseBool = (value: unknown) => String(value ?? '').toLowerCase().includes('true')
     const parseNum = (value: unknown, suffix: string) => parseInt(String(value || '0').replace(suffix, '')) || 0
 
@@ -66,7 +82,7 @@ export default function Credentials() {
 
   const fetchCurrentBlock = async () => {
     try {
-      const res = await fetch('https://api.explorer.provable.com/v1/testnet/block/height/latest')
+      const res = await fetch(`${ALEO_API}/block/height/latest`)
       if (res.ok) {
         const height = parseInt(await res.text())
         if (!isNaN(height)) setCurrentBlock(height)
@@ -89,6 +105,7 @@ export default function Credentials() {
     setLoading(true)
     try {
       const raw = await getRecords()
+      console.log('[credentials] Raw records from wallet:', JSON.stringify(raw, null, 2))
       const credentials = raw
         .filter(r => isCredentialRecord(r as Record<string, unknown>))
         .map(r => parseRecord(r as Record<string, unknown>))

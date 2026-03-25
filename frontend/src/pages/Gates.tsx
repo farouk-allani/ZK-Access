@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useWallet, queryMapping } from '../context/WalletContext'
 import { Lock, Plus, Search, ArrowRight, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react'
@@ -43,6 +43,51 @@ function addKnownGateId(gateId: string) {
   }
 }
 
+function parseU64(raw: string | null): number {
+  if (!raw) return 0
+  const value = parseInt(raw.replace('u64', '').trim(), 10)
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+const DEFI_TEMPLATES = [
+  {
+    name: 'OFAC-Compliant DEX',
+    desc: 'Standard DeFi compliance — KYC verified, not in restricted countries',
+    minAge: 18,
+    requireKyc: true,
+    requireNotRestricted: true,
+    requireAccredited: false,
+    color: 'var(--color-sky)',
+  },
+  {
+    name: 'SEC Accredited Pool',
+    desc: 'Investment DAOs & lending pools requiring accredited investor status',
+    minAge: 18,
+    requireKyc: true,
+    requireNotRestricted: true,
+    requireAccredited: true,
+    color: 'var(--color-amber)',
+  },
+  {
+    name: 'Age-Gated DeFi',
+    desc: 'Financial products requiring minimum age verification (21+)',
+    minAge: 21,
+    requireKyc: true,
+    requireNotRestricted: false,
+    requireAccredited: false,
+    color: 'var(--color-coral)',
+  },
+  {
+    name: 'Global KYC Gate',
+    desc: 'Basic KYC-only gate — identity verified, open to all countries',
+    minAge: 0,
+    requireKyc: true,
+    requireNotRestricted: false,
+    requireAccredited: false,
+    color: 'var(--color-mint)',
+  },
+]
+
 type Section = 'browse' | 'create'
 
 export default function Gates() {
@@ -67,24 +112,48 @@ export default function Gates() {
 
   const fetchKnownGates = async () => {
     setLoadingGates(true)
-    const ids = getKnownGateIds()
-    const configs: GateConfig[] = []
+    const discoveredIds = new Set<string>(getKnownGateIds())
 
-    for (const id of ids) {
-      const key = id.endsWith('field') ? id : `${id}field`
-      const result = await queryMapping('gates', key)
-      if (result && result !== 'null') {
-        const parsed = parseGateConfig(result, id)
-        if (parsed) configs.push(parsed)
+    // Fetch gate counter to know how many gates exist on-chain.
+    const gateCounterRaw = await queryMapping('gate_counter', '0u8')
+    const gateCount = parseU64(gateCounterRaw)
+    const maxLoad = Math.min(gateCount, 200)
+
+    // Fetch all gate IDs in parallel instead of sequentially.
+    if (maxLoad > 0) {
+      const indexPromises = Array.from({ length: maxLoad }, (_, i) =>
+        queryMapping('gate_index', `${i}u64`)
+      )
+      const indexResults = await Promise.all(indexPromises)
+
+      for (const gateIdRaw of indexResults) {
+        if (!gateIdRaw || gateIdRaw === 'null') continue
+        const normalized = gateIdRaw.endsWith('field') ? gateIdRaw : `${gateIdRaw}field`
+        discoveredIds.add(normalized)
+        addKnownGateId(normalized)
       }
     }
+
+    // Fetch all gate configs in parallel.
+    const ids = Array.from(discoveredIds)
+    const configPromises = ids.map(id => {
+      const key = id.endsWith('field') ? id : `${id}field`
+      return queryMapping('gates', key).then(result => {
+        if (result && result !== 'null') return parseGateConfig(result, id)
+        return null
+      })
+    })
+    const configs = (await Promise.all(configPromises)).filter((c): c is GateConfig => c !== null)
 
     setGates(configs)
     setLoadingGates(false)
   }
 
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => {
     fetchKnownGates()
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [])
 
   const handleLookup = async () => {
@@ -96,10 +165,11 @@ export default function Gates() {
     const result = await queryMapping('gates', key)
 
     if (result && result !== 'null') {
-      const parsed = parseGateConfig(result, lookupId.trim())
+      const normalizedGateId = key.endsWith('field') ? key : `${key}field`
+      const parsed = parseGateConfig(result, normalizedGateId)
       setLookupResult(parsed)
       if (parsed) {
-        addKnownGateId(lookupId.trim())
+        addKnownGateId(normalizedGateId)
       }
     } else {
       addToast('Gate not found', 'error')
@@ -127,8 +197,22 @@ export default function Gates() {
     setExplorerTxId(result?.explorerId ?? null)
     setCreating(false)
 
-    // We can't know the gate_id until the transaction is confirmed and we read gate_counter
-    // For now, show success and let user look it up
+    if (result?.id) {
+      // Poll for the new gate to appear on-chain (indexing takes ~10-30s).
+      if (pollRef.current) clearInterval(pollRef.current)
+      const prevCount = gates.length
+      pollRef.current = setInterval(async () => {
+        await fetchKnownGates()
+        const counterRaw = await queryMapping('gate_counter', '0u8')
+        const count = parseU64(counterRaw)
+        if (count > prevCount && pollRef.current) {
+          clearInterval(pollRef.current)
+          pollRef.current = null
+        }
+      }, 8_000)
+      // Stop polling after 2 minutes regardless.
+      setTimeout(() => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }, 120_000)
+    }
   }
 
   if (!connected) {
@@ -188,7 +272,7 @@ export default function Gates() {
               Create Another Gate
             </button>
             <button
-              onClick={() => { setTxId(null); setSection('browse') }}
+              onClick={() => { setTxId(null); setSection('browse'); void fetchKnownGates() }}
               className="brut-btn"
               style={{ background: 'var(--color-amber)' }}
             >
@@ -368,6 +452,41 @@ export default function Gates() {
 
       {section === 'create' && (
         <form onSubmit={handleCreate} className="space-y-6">
+          {/* DeFi Compliance Templates */}
+          <div className="brut-card-static bg-white p-6 sm:p-8">
+            <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+              DeFi Compliance Templates
+            </h3>
+            <p className="text-xs mb-4" style={{ color: '#6b7280' }}>
+              Pre-configured gates for common DeFi regulatory requirements. Click to auto-fill.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {DEFI_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.name}
+                  type="button"
+                  onClick={() => setForm({
+                    minAge: tpl.minAge,
+                    requireKyc: tpl.requireKyc,
+                    requireNotRestricted: tpl.requireNotRestricted,
+                    requireAccredited: tpl.requireAccredited,
+                  })}
+                  className="text-left p-3 rounded-xl transition-all"
+                  style={{ border: '2px solid var(--color-ink)', background: tpl.color }}
+                >
+                  <div className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)' }}>{tpl.name}</div>
+                  <div className="text-xs mt-1" style={{ opacity: 0.8 }}>{tpl.desc}</div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {tpl.minAge > 0 && <span className="brut-badge text-xs" style={{ background: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>{tpl.minAge}+</span>}
+                    {tpl.requireKyc && <span className="brut-badge text-xs" style={{ background: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>KYC</span>}
+                    {tpl.requireNotRestricted && <span className="brut-badge text-xs" style={{ background: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>OFAC</span>}
+                    {tpl.requireAccredited && <span className="brut-badge text-xs" style={{ background: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>SEC</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="brut-card-static bg-white p-6 sm:p-8">
             <h3 className="text-lg font-bold mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
               Gate Requirements

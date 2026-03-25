@@ -126,6 +126,7 @@ function toRecordInput(record: Record<string, unknown> | string): string | null 
   }
 
   const directCandidates = [
+    record.recordPlaintext,
     record.record,
     record.plaintext,
     record.value,
@@ -246,7 +247,9 @@ export default function Prove() {
     const record = records[selectedRecord]
     const proofConfig = PROOF_TYPES.find(p => p.value === proofType)!
 
-    const recordStr = toRecordInput(record)
+    // Shield wallet needs recordCiphertext; other wallets need plaintext
+    const recordStr = (record.recordCiphertext as string)
+      || toRecordInput(record)
     if (!recordStr) {
       addToast('Selected credential format is not supported by wallet', 'error')
       setLoading(false)
@@ -276,7 +279,7 @@ export default function Prove() {
       inputs = [recordStr, `${claimType}u8`, `${minAge}u8`]
     }
 
-    const result = await executeTransition(proofConfig.fn, inputs)
+    const result = await executeTransition(proofConfig.fn, inputs, undefined, [0])
     setTxId(result?.id ?? null)
     setExplorerTxId(result?.explorerId ?? null)
     setLoading(false)

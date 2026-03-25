@@ -11,6 +11,7 @@ export default function Navbar() {
 
   const NAV_LINKS = [
     { to: '/', label: 'Home' },
+    { to: '/kyc', label: 'KYC' },
     { to: '/issue', label: 'Issue' },
     { to: '/credentials', label: 'Credentials' },
     { to: '/prove', label: 'Prove' },

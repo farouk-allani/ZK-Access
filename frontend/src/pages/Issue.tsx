@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useWallet, queryMapping } from '../context/WalletContext'
+import { useWallet, queryMapping, ALEO_API } from '../context/WalletContext'
 import { Link } from 'react-router-dom'
 import { Send, ArrowRight, AlertTriangle, ExternalLink, ShieldCheck, ShieldX } from 'lucide-react'
 import { COUNTRY_NAMES, RESTRICTED_COUNTRIES, VALIDITY_OPTIONS } from '../types'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 export default function Issue() {
-  const { connected, address, executeTransition } = useWallet()
+  const { connected, address, executeTransition, addToast } = useWallet()
   const [loading, setLoading] = useState(false)
   const [txId, setTxId] = useState<string | null>(null)
   const [explorerTxId, setExplorerTxId] = useState<string | null>(null)
@@ -20,6 +20,18 @@ export default function Issue() {
     accreditedInvestor: false,
     validityBlocks: 129600,
   })
+
+  const fetchCurrentBlockHeight = async (): Promise<number | null> => {
+    try {
+      const response = await fetch(`${ALEO_API}/block/height/latest`)
+      if (!response.ok) return null
+      const raw = (await response.text()).trim()
+      const parsed = parseInt(raw, 10)
+      return Number.isFinite(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
 
   useEffect(() => {
     if (!connected || !address) {
@@ -44,6 +56,13 @@ export default function Issue() {
     setExplorerTxId(null)
 
     const recipient = form.owner || address
+    const currentHeight = await fetchCurrentBlockHeight()
+    if (currentHeight == null) {
+      addToast('Failed to fetch latest block height. Please retry.', 'error')
+      setLoading(false)
+      return
+    }
+
     const inputs = [
       recipient,
       `${form.age}u8`,
@@ -51,6 +70,7 @@ export default function Issue() {
       `${form.kycPassed}`,
       `${form.accreditedInvestor}`,
       `${form.validityBlocks}u32`,
+      `${currentHeight}u32`,
     ]
 
     const result = await executeTransition('issue_credential', inputs)

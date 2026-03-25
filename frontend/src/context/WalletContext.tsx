@@ -2,9 +2,9 @@ import { createContext, useContext, useState, useCallback, useEffect, type React
 import { useWallet as useAdapterWallet } from '@provablehq/aleo-wallet-adaptor-react'
 import type { Toast, TxRecord } from '../types'
 
-export const PROGRAM_ID = 'zkaccess_v3.aleo'
+export const PROGRAM_ID = import.meta.env.VITE_ALEO_PROGRAM_ID || 'zkaccess_v3.aleo'
 const DEFAULT_FEE = 500_000
-const ALEO_API = 'https://api.explorer.provable.com/v1/testnet'
+export const ALEO_API = import.meta.env.VITE_ALEO_API || 'https://api.explorer.provable.com/v1/testnet'
 
 // Set this to the address that calls initialize_admin() after deployment.
 export const ADMIN_ADDRESS = '' // Will be set after deployment
@@ -60,6 +60,7 @@ function extractRecordInput(record: unknown): string | null {
 
   const source = record as Record<string, unknown>
   const candidates = [
+    source.recordPlaintext,
     source.record,
     source.ciphertext,
     source.cipher_text,
@@ -188,6 +189,7 @@ export function useWallet() {
     functionName: string,
     inputs: string[],
     fee = DEFAULT_FEE,
+    recordIndices?: number[],
   ): Promise<{ id: string; explorerId: string | null } | null> => {
     if (!adapter.connected) {
       app.addToast('Wallet not connected', 'error')
@@ -200,6 +202,8 @@ export function useWallet() {
         function: functionName,
         inputs,
         fee,
+        privateFee: false,
+        ...(recordIndices ? { recordIndices } : {}),
       })
 
       const tx = pickTransactionIds(result)

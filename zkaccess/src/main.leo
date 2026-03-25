@@ -3,6 +3,11 @@
 
 program zkaccess_v3.aleo {
 
+    // ─── Constructor (required for deployment on current consensus) ────
+
+    @noupgrade
+    async constructor() {}
+
     // ─── Records (Private State) ───────────────────────────────────────
 
     // Private credential — all fields encrypted, only the owner can decrypt.
@@ -51,6 +56,9 @@ program zkaccess_v3.aleo {
 
     // Gate definitions by gate_id.
     mapping gates: field => GateConfig;
+
+    // Gate index for deterministic discovery (index => gate_id).
+    mapping gate_index: u64 => field;
 
     // Gate owners by gate_id.
     mapping gate_owners: field => address;
@@ -103,9 +111,10 @@ program zkaccess_v3.aleo {
         kyc_passed: bool,
         accredited_investor: bool,
         validity_blocks: u32,
+        current_height: u32,
     ) -> (Credential, Future) {
         let cred_id: field = BHP256::hash_to_field(recipient);
-        let issued: u32 = block.height;
+        let issued: u32 = current_height;
         let expires: u32 = issued + validity_blocks;
 
         let cred: Credential = Credential {
@@ -143,8 +152,9 @@ program zkaccess_v3.aleo {
     async transition renew_credential(
         credential: Credential,
         new_validity: u32,
+        current_height: u32,
     ) -> (Credential, Future) {
-        let new_expires: u32 = block.height + new_validity;
+        let new_expires: u32 = current_height + new_validity;
 
         let renewed: Credential = Credential {
             owner: credential.owner,
@@ -154,7 +164,7 @@ program zkaccess_v3.aleo {
             country_code: credential.country_code,
             kyc_passed: credential.kyc_passed,
             accredited_investor: credential.accredited_investor,
-            issued_at: block.height,
+            issued_at: current_height,
             expires_at: new_expires,
         };
 
@@ -201,6 +211,7 @@ program zkaccess_v3.aleo {
         };
 
         gates.set(gate_id, config);
+        gate_index.set(count, gate_id);
         gate_owners.set(gate_id, creator);
         gate_counter.set(0u8, count + 1u64);
     }
@@ -252,7 +263,7 @@ program zkaccess_v3.aleo {
             gate_id: gate_id,
             claim_type: 0u8,
             passed: true,
-            proof_height: block.height,
+            proof_height: 0u32,
         };
 
         let returned_cred: Credential = Credential {
@@ -330,7 +341,7 @@ program zkaccess_v3.aleo {
             gate_id: 0field,
             claim_type: claim_type,
             passed: true,
-            proof_height: block.height,
+            proof_height: 0u32,
         };
 
         let returned_cred: Credential = Credential {
@@ -371,6 +382,6 @@ program zkaccess_v3.aleo {
         return finalize_verify_proof(proof_key);
     }
     async function finalize_verify_proof(proof_key: field) {
-        let _height: u32 = proof_registry.get(proof_key);
+        let proof_height: u32 = proof_registry.get(proof_key);
     }
 }

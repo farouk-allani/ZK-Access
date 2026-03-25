@@ -8,6 +8,7 @@ import Prove from './pages/Prove'
 import Verify from './pages/Verify'
 import Gates from './pages/Gates'
 import Admin from './pages/Admin'
+import KYC from './pages/KYC'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/kyc" element={<KYC />} />
           <Route path="/issue" element={<Issue />} />
           <Route path="/credentials" element={<Credentials />} />
           <Route path="/prove" element={<Prove />} />

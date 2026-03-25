@@ -1,0 +1,740 @@
+{
+  "program": "zkaccess_v3.aleo",
+  "structs": [
+    {
+      "path": [
+        "GateConfig"
+      ],
+      "fields": [
+        {
+          "name": "min_age",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          }
+        },
+        {
+          "name": "require_kyc",
+          "ty": {
+            "Primitive": "Boolean"
+          }
+        },
+        {
+          "name": "require_not_restricted",
+          "ty": {
+            "Primitive": "Boolean"
+          }
+        },
+        {
+          "name": "require_accredited",
+          "ty": {
+            "Primitive": "Boolean"
+          }
+        },
+        {
+          "name": "active",
+          "ty": {
+            "Primitive": "Boolean"
+          }
+        }
+      ]
+    }
+  ],
+  "records": [
+    {
+      "path": [
+        "Credential"
+      ],
+      "fields": [
+        {
+          "name": "owner",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "issuer",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "credential_id",
+          "ty": {
+            "Primitive": "Field"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "age",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "country_code",
+          "ty": {
+            "Primitive": {
+              "UInt": "U16"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "kyc_passed",
+          "ty": {
+            "Primitive": "Boolean"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "accredited_investor",
+          "ty": {
+            "Primitive": "Boolean"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "issued_at",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "expires_at",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          },
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "path": [
+        "AccessToken"
+      ],
+      "fields": [
+        {
+          "name": "owner",
+          "ty": {
+            "Primitive": "Address"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "gate_id",
+          "ty": {
+            "Primitive": "Field"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "claim_type",
+          "ty": {
+            "Primitive": {
+              "UInt": "U8"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "passed",
+          "ty": {
+            "Primitive": "Boolean"
+          },
+          "mode": "None"
+        },
+        {
+          "name": "proof_height",
+          "ty": {
+            "Primitive": {
+              "UInt": "U32"
+            }
+          },
+          "mode": "None"
+        }
+      ]
+    }
+  ],
+  "mappings": [
+    {
+      "name": "admin",
+      "key": {
+        "Primitive": {
+          "UInt": "U8"
+        }
+      },
+      "value": {
+        "Primitive": "Address"
+      }
+    },
+    {
+      "name": "authorized_issuers",
+      "key": {
+        "Primitive": "Address"
+      },
+      "value": {
+        "Primitive": "Boolean"
+      }
+    },
+    {
+      "name": "revoked_credentials",
+      "key": {
+        "Primitive": "Field"
+      },
+      "value": {
+        "Primitive": "Boolean"
+      }
+    },
+    {
+      "name": "gates",
+      "key": {
+        "Primitive": "Field"
+      },
+      "value": {
+        "Struct": {
+          "path": [
+            "GateConfig"
+          ],
+          "program": "zkaccess_v3"
+        }
+      }
+    },
+    {
+      "name": "gate_index",
+      "key": {
+        "Primitive": {
+          "UInt": "U64"
+        }
+      },
+      "value": {
+        "Primitive": "Field"
+      }
+    },
+    {
+      "name": "gate_owners",
+      "key": {
+        "Primitive": "Field"
+      },
+      "value": {
+        "Primitive": "Address"
+      }
+    },
+    {
+      "name": "gate_counter",
+      "key": {
+        "Primitive": {
+          "UInt": "U8"
+        }
+      },
+      "value": {
+        "Primitive": {
+          "UInt": "U64"
+        }
+      }
+    },
+    {
+      "name": "proof_registry",
+      "key": {
+        "Primitive": "Field"
+      },
+      "value": {
+        "Primitive": {
+          "UInt": "U32"
+        }
+      }
+    }
+  ],
+  "storage_variables": [],
+  "transitions": [
+    {
+      "name": "initialize_admin",
+      "is_async": true,
+      "inputs": [],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "register_issuer",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "issuer",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Address"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "revoke_issuer",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "issuer",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Address"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "issue_credential",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "recipient",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Address"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "age",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "country_code",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U16"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "kyc_passed",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "accredited_investor",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "validity_blocks",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U32"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "current_height",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U32"
+              }
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "revoke_credential",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "credential_id",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Field"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "renew_credential",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "credential",
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "new_validity",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U32"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "current_height",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U32"
+              }
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "create_gate",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "min_age",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_kyc",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_not_restricted",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_accredited",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_gate",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "gate_id",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Field"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "pass_gate",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "credential",
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "gate_id",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Field"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "min_age",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_kyc",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_not_restricted",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "require_accredited",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Boolean"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "AccessToken"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "prove_single",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "credential",
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "claim_type",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "name": "min_age",
+          "ty": {
+            "Plaintext": {
+              "Primitive": {
+                "UInt": "U8"
+              }
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "Credential"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": {
+            "Record": {
+              "path": [
+                "AccessToken"
+              ],
+              "program": "zkaccess_v3"
+            }
+          },
+          "mode": "None"
+        },
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    },
+    {
+      "name": "verify_proof",
+      "is_async": true,
+      "inputs": [
+        {
+          "name": "subject",
+          "ty": {
+            "Plaintext": {
+              "Primitive": "Address"
+            }
+          },
+          "mode": "None"
+        }
+      ],
+      "outputs": [
+        {
+          "ty": "Future",
+          "mode": "None"
+        }
+      ]
+    }
+  ]
+}

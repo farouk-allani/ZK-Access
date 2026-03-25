@@ -1,35 +1,164 @@
 # ZK-Access v3
 
-**Privacy-Preserving ZK-Gated Access Control Protocol on Aleo.**
+**Privacy-Preserving DeFi Compliance Protocol on Aleo — Real KYC, Encrypted Credentials, Zero-Knowledge Access Control.**
 
-Issue credentials, create access gates, prove eligibility — without ever exposing personal data.
+Real identity verification through Sumsub, encrypted credentials on Aleo, and zero-knowledge proofs for DeFi protocol compliance — without ever exposing personal data.
 
 **Live Demo:** [zk-access-liard.vercel.app](https://zk-access-liard.vercel.app)
 **Program:** [`zkaccess_v3.aleo`](https://testnet.aleoscan.io/program?id=zkaccess_v3.aleo)
+**KYC Provider:** [Sumsub](https://sumsub.com) (embedded WebSDK, sandbox mode)
 **Wallet Support:** [Shield Wallet](https://shield.app) & [Leo Wallet](https://www.leo.app/)
 
 ---
 
-## What It Does
+## The Problem
 
-ZK-Access is a **ZK-Gated Access Control Protocol** — any service or dApp can define access requirements ("gates"), and users privately prove they meet those requirements without revealing personal data.
+DeFi protocols face an impossible choice:
 
-1. **Authorized Issuers** create encrypted credential records with expiration
-2. **Services** create access gates with custom requirements (age, KYC, country, accredited investor)
-3. **Users** pass gates by proving their credential meets all requirements — privately
-4. **Anyone** can verify a proof exists on-chain — without learning what was proven
+1. **No compliance** — risk regulatory shutdown, sanctions violations, and liability
+2. **Traditional KYC** — users hand over passport scans, income proof, and SSNs to every protocol. Each creates a data exposure point. Hacks leak millions of identities.
 
-### Why Privacy Matters Here
+There is no way to prove "I'm 18+, KYC'd, and not sanctioned" without revealing your passport, age, country, and identity to every protocol that asks.
 
-Traditional access control requires sharing sensitive personal data (passport, ID, income proof) with every service. Each verification creates a new data exposure point. ZK-Access inverts this: the user holds their credential privately and proves only the boolean result (pass/fail) to any verifier. No data leaves the wallet.
+## The Solution: ZK-Access
 
-The **gate system** makes this composable: instead of each service building custom verification, they define a gate and ZK-Access handles the private proving.
+ZK-Access bridges real-world identity verification with on-chain zero-knowledge proofs:
+
+```
+Real KYC (Sumsub) → Encrypted Credential (Aleo) → ZK-Gated Access (Zero Knowledge)
+```
+
+1. **Verify once** with Sumsub — real government ID scan, liveness check, sanctions screening
+2. **Receive an encrypted credential** on Aleo — only you can decrypt it
+3. **Pass DeFi compliance gates** with ZK proofs — protocols learn only "approved" or "denied"
+4. **Your data never leaves your wallet** — not to the protocol, not to the blockchain, not to anyone
 
 ---
 
-## Program: `zkaccess_v3.aleo`
+## Architecture
 
-**12 transitions, 7 mappings, 2 records, 1 struct** — all using async transitions with on-chain finalization.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                              USER                                       │
+│    ┌─────────────┐    ┌──────────────────────────────────────────────┐  │
+│    │ Shield/Leo   │    │  Frontend (React)                           │  │
+│    │ Wallet       │◄──►│  ┌──────────────────────────────────────┐   │  │
+│    │ (keys+creds) │    │  │  Sumsub WebSDK (embedded widget)     │   │  │
+│    └──────┬───────┘    │  │  - ID Document Scan                  │   │  │
+│           │            │  │  - Liveness Check (selfie match)     │   │  │
+│           │            │  │  - Sanctions & PEP Screening         │   │  │
+│           │            │  └──────────────────────────────────────┘   │  │
+│           │            └──────────────────┬──────────────────────────┘  │
+└───────────┼───────────────────────────────┼─────────────────────────────┘
+            │                               │
+            │                        ┌──────▼───────┐
+            │                        │  KYC Bridge  │
+            │                        │  Backend     │
+            │                        │  (Express)   │
+            │                        │  - Token gen │
+            │                        │  - Webhook   │
+            │                        │  - Status    │
+            │                        └──────┬───────┘
+            │                               │
+            │        ┌──────────────────────┘
+            │        │  Webhook: applicantReviewed
+            │        │  → extract age, country, KYC
+            │        │  → auto-issue credential
+            │        │
+    ┌───────▼────────▼──────────────────────────────┐
+    │              zkaccess_v3.aleo                  │
+    │                                                │
+    │  ┌──────────────────────────────────────────┐  │
+    │  │         PRIVATE TRANSITIONS              │  │
+    │  │  issue_credential  (encrypted record)    │  │
+    │  │  pass_gate         (ZK proof)            │  │
+    │  │  prove_single      (single claim proof)  │  │
+    │  └──────────────────┬───────────────────────┘  │
+    │                     │                          │
+    │  ┌──────────────────▼───────────────────────┐  │
+    │  │         ASYNC FINALIZE                   │  │
+    │  │  On-chain validation:                    │  │
+    │  │  - Issuer authorization check            │  │
+    │  │  - Credential revocation check           │  │
+    │  │  - Credential expiration check           │  │
+    │  │  - Gate config validation                │  │
+    │  │  - Proof registry recording              │  │
+    │  │                                          │  │
+    │  │  8 Mappings | 12 Transitions | 2 Records │  │
+    │  └──────────────────────────────────────────┘  │
+    └────────────────────────────────────────────────┘
+```
+
+### The Pipeline — Step by Step
+
+| Step | What Happens | Where | Data Exposed |
+|------|-------------|-------|-------------|
+| 1. KYC | User scans government ID, completes liveness check | Sumsub WebSDK (in-app) | Full ID to Sumsub only |
+| 2. Extract | Backend webhook extracts boolean facts: age, country, KYC pass | KYC Bridge | Structured data (not stored) |
+| 3. Issue | Encrypted credential created on-chain with verified data | Aleo (on-chain) | **Nothing** — record encrypted |
+| 4. Gate | DeFi protocol defines compliance requirements | Aleo (on-chain) | Gate config is public |
+| 5. Prove | User generates ZK proof that credential meets gate | User's wallet (local) | **Nothing** — ZK proof |
+| 6. Verify | Protocol checks proof_registry on-chain | Aleo (on-chain) | **Boolean only** — pass/fail |
+
+---
+
+## Real KYC Integration: Sumsub
+
+ZK-Access integrates with [Sumsub](https://sumsub.com), a production KYC/AML provider used by Binance, MoonPay, Bybit, and 2,000+ companies worldwide.
+
+### Why Sumsub
+
+- **Production-grade KYC**: Government ID scanning, liveness detection, sanctions/PEP screening (SOC2 & ISO 27001)
+- **Embedded WebSDK**: Verification widget runs directly in our app — user never leaves the page
+- **Used by Binance, MoonPay, OKX, Bybit**: Judges recognize the provider, real industry credibility
+- **Free sandbox**: Self-serve signup at [sumsub.com](https://sumsub.com), test verifications with auto-approval
+- **Webhook callbacks**: Real-time verification result delivery to our backend
+- **6,500+ document types**: 220+ countries and territories supported
+
+### Integration Flow
+
+```
+User clicks "Start Identity Verification"
+    │
+    ▼
+Backend generates Sumsub WebSDK access token (POST /api/kyc/token)
+    │
+    ▼
+Sumsub WebSDK widget launches INSIDE our app:
+  - User uploads government ID document
+  - Completes liveness check (selfie match with document)
+  - Sanctions & PEP screening runs automatically
+    │
+    ▼
+Sumsub sends webhook to backend (POST /api/webhook/sumsub)
+    │
+    ▼
+Backend extracts: age (from DOB), country (from ID), KYC status
+    │
+    ▼
+Auto-issues encrypted credential on Aleo (or manual issuance via wallet)
+    │
+    ▼
+User can now pass DeFi compliance gates with ZK proofs
+```
+
+### Backend API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/health` | GET | Backend status, provider info |
+| `/api/kyc/token` | POST | Generate Sumsub WebSDK access token |
+| `/api/kyc/status?wallet=<address>` | GET | Check verification status |
+| `/api/kyc/check` | POST | Poll applicant verification status |
+| `/api/kyc/issue` | POST | Get verified data for manual credential issuance |
+| `/api/webhook/sumsub` | POST | Sumsub webhook — verification result callbacks |
+| `/api/kyc/pending` | GET | List pending verified users (issuer dashboard) |
+
+---
+
+## Smart Contract: `zkaccess_v3.aleo`
+
+**12 transitions, 8 mappings, 2 records, 1 struct** — all using async transitions with on-chain finalization.
 
 ### Records (Private)
 
@@ -46,33 +175,49 @@ The **gate system** makes this composable: instead of each service building cust
 | `authorized_issuers` | address => bool | Issuer whitelist |
 | `revoked_credentials` | field => bool | Revoked credential IDs |
 | `gates` | field => GateConfig | Gate requirement configs |
+| `gate_index` | u64 => field | Deterministic gate discovery |
 | `gate_owners` | field => address | Gate creator addresses |
 | `gate_counter` | u8 => u64 | Auto-increment gate IDs |
 | `proof_registry` | field => u32 | Proof existence registry |
 
 ### Transitions
 
-| Transition | Type | Purpose |
-|-----------|------|---------|
-| `initialize_admin()` | async | Set deployer as admin (once) |
-| `register_issuer(issuer)` | async | Admin adds authorized issuer |
-| `revoke_issuer(issuer)` | async | Admin removes issuer |
-| `issue_credential(recipient, age, country, kyc, accredited, validity)` | async | Issue credential (checks issuer auth) |
-| `revoke_credential(credential_id)` | async | Revoke a credential |
-| `renew_credential(credential, new_validity)` | async | Reissue expired credential |
-| `create_gate(min_age, require_kyc, require_country, require_accredited)` | async | Create access gate |
-| `deactivate_gate(gate_id)` | async | Gate owner disables gate |
-| `pass_gate(credential, gate_id, min_age, kyc, country, accredited)` | async | **Core:** privately prove credential meets gate |
-| `prove_single(credential, claim_type, min_age)` | async | Single-claim proof with checks |
-| `verify_proof(subject)` | async | Third-party proof verification |
+| Transition | Purpose |
+|-----------|---------|
+| `initialize_admin()` | Set deployer as admin (once) |
+| `register_issuer(issuer)` | Admin adds authorized issuer |
+| `revoke_issuer(issuer)` | Admin removes issuer |
+| `issue_credential(recipient, age, country, kyc, accredited, validity, height)` | Issue credential (checks issuer auth) |
+| `revoke_credential(credential_id)` | Revoke a credential |
+| `renew_credential(credential, new_validity, height)` | Extend credential expiration |
+| `create_gate(min_age, require_kyc, require_country, require_accredited)` | Create DeFi compliance gate |
+| `deactivate_gate(gate_id)` | Gate owner disables gate |
+| `pass_gate(credential, gate_id, min_age, kyc, country, accredited)` | **Core:** ZK proof that credential meets all gate requirements |
+| `prove_single(credential, claim_type, min_age)` | Single-claim proof (age, KYC, country, accredited) |
+| `verify_proof(subject)` | Third-party proof verification |
 
 ### Key Design: `pass_gate`
 
-The `pass_gate` transition demonstrates Aleo's privacy model at its best:
+The `pass_gate` transition is the core innovation:
 
-- **Private transition:** asserts credential fields against gate requirements in the ZK proof. The user's age, country, KYC status, and investor status are checked privately — never revealed on-chain.
-- **Async finalize:** validates the gate is active, credential is not revoked, not expired, and the public inputs match the actual gate config in the mapping — preventing forgery.
-- **Result:** only a boolean access token is created. The proof is recorded in the `proof_registry` for third-party verification.
+- **Private transition:** checks credential fields against gate requirements inside the ZK proof. Age, country, KYC, and investor status are verified privately — never revealed on-chain.
+- **Async finalize:** validates gate exists and is active, credential is not revoked, not expired, and public inputs match gate config — preventing forgery.
+- **Result:** only a boolean access token + proof_registry entry. Zero personal data on-chain.
+
+---
+
+## DeFi Compliance Gate Templates
+
+ZK-Access ships with pre-built gate templates for real DeFi regulatory scenarios:
+
+| Template | Requirements | Use Case |
+|----------|-------------|----------|
+| **OFAC-Compliant DEX** | 18+, KYC, non-restricted country | Standard DeFi compliance for decentralized exchanges |
+| **SEC Accredited Pool** | 18+, KYC, non-restricted, accredited investor | Investment DAOs, lending pools, securities offerings |
+| **Age-Gated DeFi** | 21+, KYC | Financial products requiring higher age verification |
+| **Global KYC Gate** | KYC only | Basic identity verification, open to all countries |
+
+Protocols can also create custom gates with any combination of requirements.
 
 ---
 
@@ -80,61 +225,27 @@ The `pass_gate` transition demonstrates Aleo's privacy model at its best:
 
 | What | Private? | How |
 |------|----------|-----|
-| Credential data (age, country, KYC, etc.) | **Always private** | Encrypted Aleo records — only owner's key can decrypt |
-| Proof result | **Boolean only** | `pass_gate` reveals only "passed/failed", not which checks passed |
+| Credential data (age, country, KYC) | **Always private** | Encrypted Aleo records — only owner's key can decrypt |
+| Proof result | **Boolean only** | `pass_gate` reveals only "passed/failed" |
 | Who issued to whom | **Private** | Issuer-recipient relationship inside encrypted record |
-| Gate requirements | **Public** | Stored in mappings — verifiers can see what gates require |
-| Proof existence | **Public** | Recorded in `proof_registry` — verifiers can confirm a proof exists |
-| Credential data in proofs | **Never revealed** | Consumed as private input; Aleo guarantees it stays private |
-| Execution | **Local** | Proof generation happens in the user's wallet/browser |
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                    Frontend (React)                  │
-│  ┌─────────┬────────┬───────┬───────┬─────┬───────┐ │
-│  │  Issue  │ Creds  │ Prove │ Gates │ Verify│Admin │ │
-│  └────┬────┴───┬────┴───┬───┴───┬───┴───┬──┴───┬──┘ │
-│       │        │        │       │       │      │     │
-│       └────────┴────────┴───┬───┴───────┴──────┘     │
-│                             │                        │
-│              WalletContext + queryMapping             │
-│                     │              │                  │
-└─────────────────────┼──────────────┼──────────────────┘
-                      │              │
-              ┌───────▼───────┐ ┌────▼──────────┐
-              │ Shield / Leo  │ │ Aleo REST API │
-              │    Wallet     │ │  (Mappings)   │
-              └───────┬───────┘ └───────────────┘
-                      │
-              ┌───────▼───────────────────────┐
-              │     zkaccess_v3.aleo          │
-              │  ┌─────────────────────────┐  │
-              │  │  Private Transitions    │  │
-              │  │  (ZK proof generation)  │  │
-              │  └───────────┬─────────────┘  │
-              │              │                │
-              │  ┌───────────▼─────────────┐  │
-              │  │  Async Finalize         │  │
-              │  │  (On-chain validation)  │  │
-              │  │  7 Mappings             │  │
-              │  └─────────────────────────┘  │
-              └───────────────────────────────┘
-```
+| Gate requirements | **Public** | Stored in mappings — verifiers see what gates require |
+| Proof existence | **Public** | Recorded in `proof_registry` for verification |
+| KYC documents | **Never on-chain** | Processed by Sumsub only, boolean facts extracted |
 
 ---
 
 ## Tech Stack
 
-- **Leo** — Aleo's ZK programming language (async transitions + mappings)
-- **Aleo Testnet** — privacy-preserving L1
-- **Shield Wallet / Leo Wallet** — via `@provablehq/aleo-wallet-adaptor-react` (official Provable SDK)
-- **React 18 + Vite + Tailwind 4** — frontend
-- **TypeScript** — full type safety
-- **Neo-brutalism** — distinctive design system
+| Layer | Technology |
+|-------|-----------|
+| **Smart Contract** | Leo (Aleo's ZK language) — async transitions + finalize |
+| **Blockchain** | Aleo Testnet — privacy-preserving L1 |
+| **KYC Provider** | Sumsub — production KYC used by Binance, MoonPay, Bybit |
+| **KYC Bridge** | Node.js + Express — WebSDK token gen, webhook processing |
+| **Frontend** | React 18 + TypeScript + Vite + Tailwind 4 |
+| **KYC Widget** | Sumsub WebSDK — embedded in-app verification |
+| **Wallets** | Shield Wallet + Leo Wallet via @provablehq/aleo-wallet-adaptor |
+| **Design** | Neo-brutalism design system |
 
 ---
 
@@ -142,13 +253,14 @@ The `pass_gate` transition demonstrates Aleo's privacy model at its best:
 
 | Page | Purpose |
 |------|---------|
-| **Home** | Landing page with features, steps, and use cases |
-| **Issue** | Issue credentials (with issuer authorization check and validity period) |
-| **Credentials** | View credential records with expiration and revocation status |
-| **Prove** | Generate single proofs or pass access gates |
-| **Gates** | Create and browse ZK access gates |
+| **Home** | Landing page — DeFi compliance narrative, pipeline visualization, use cases |
+| **KYC** | Real identity verification through embedded Sumsub WebSDK — 3-step flow |
+| **Issue** | Issue credentials with verified KYC data (issuer auth check) |
+| **Credentials** | View encrypted credential records — expiration, revocation status |
+| **Prove** | Generate ZK proofs — single claims or full gate access |
+| **Gates** | Create/browse DeFi compliance gates with pre-built templates |
 | **Verify** | Third-party proof verification + transaction activity |
-| **Admin** | Issuer management and credential revocation (admin only) |
+| **Admin** | Issuer management, credential revocation (admin only) |
 
 ---
 
@@ -156,113 +268,73 @@ The `pass_gate` transition demonstrates Aleo's privacy model at its best:
 
 > Requires [Shield Wallet](https://shield.app) or [Leo Wallet](https://www.leo.app/) on Aleo Testnet.
 
-1. Install Shield Wallet and switch to **Testnet**
-2. Visit the [live demo](https://zk-access-liard.vercel.app) and connect your wallet
-3. **Admin Setup** (first time): Go to Admin → Initialize Admin → Register your address as an issuer
-4. **Issue**: Go to Issue → Fill in claims → Select validity period → Submit
-5. **Create Gate**: Go to Gates → Create → Set requirements (e.g., 18+, KYC) → Submit
-6. **Pass Gate**: Go to Prove → Select credential → Choose "ZK-Gate Access" → Enter gate ID → Pass
-7. **Verify**: Go to Verify → Enter subject address → Check proof exists on-chain
+### Full Pipeline Demo (Real KYC to ZK Proof)
 
-Every action is a real Aleo transaction with async finalization. No mocks.
+1. **Connect Wallet** — Install Shield Wallet, switch to Testnet, visit the live demo
+2. **Admin Setup** — Go to Admin, Initialize Admin, Register your address as issuer
+3. **Verify Identity** — Go to KYC, click "Start Identity Verification", complete Sumsub verification in the embedded widget (sandbox auto-approves)
+4. **Receive Credential** — After KYC approval, issue your encrypted credential with verified data
+5. **Create DeFi Gate** — Go to Gates, use "OFAC-Compliant DEX" template, create gate on-chain
+6. **Pass Gate Privately** — Go to Prove, select credential, enter gate ID, generate ZK proof
+7. **Verify On-Chain** — Go to Verify, enter your address, confirm proof exists in registry
 
-## Judge Quick Test (5-7 Minutes)
+Every action is a real Aleo transaction with async finalization. **No mocks. Real KYC. Real ZK proofs.**
 
-Use this exact sequence to validate the app end-to-end.
+### Judge Quick Test (5-7 Minutes)
 
-1. Connect wallet on testnet and confirm the Home page preflight card shows Wallet Connected.
-2. Open Admin and click Initialize Admin once (skip if already initialized).
-3. In Admin, register the connected address as issuer using Register Issuer.
-4. Return to Home and click Refresh Checks in Judge Preflight Checks.
-5. Confirm Admin Initialized is Yes and Your Issuer Status is Authorized issuer.
-6. Open Issue and submit a credential to your own address.
-7. Open Gates and create a gate (for example min age 18 + KYC required).
-8. Open Credentials and confirm you can see your newly issued credential record.
-9. Open Prove and run pass_gate with your credential and gate settings.
-10. Open Verify and check proof existence for your address.
+1. Connect wallet on testnet — Home page preflight card shows status
+2. Admin, Initialize Admin (skip if done)
+3. Admin, Register Issuer with connected wallet address
+4. Home, Refresh Checks, confirm "Authorized issuer"
+5. **KYC** — click "Start Identity Verification" — Sumsub widget opens in-page
+6. Complete verification in sandbox (auto-approved with test documents)
+7. After verification, issue credential with KYC-verified data
+8. Gates, use "OFAC-Compliant DEX" template, create gate
+9. Prove, select credential, pass gate with ZK proof
+10. Verify, enter your address, confirm proof exists
 
-Expected outcomes:
-
-- Issue should submit without the Not an authorized issuer warning.
-- pass_gate should succeed when the credential satisfies gate conditions.
-- Verify should show proof activity for the subject address.
-
-If a judge gets stuck:
-
-1. Use Home -> Judge Preflight Checks -> Refresh Checks.
-2. Ensure the same wallet address is both connected and registered as issuer.
-3. Wait 10-30 seconds for explorer indexing, then refresh the page.
-4. Confirm testnet endpoint is reachable: https://api.explorer.provable.com/v1/testnet
+**Expected:** Sumsub verification (in-app widget) -> encrypted credential -> ZK gate pass -> on-chain proof. Full privacy pipeline.
 
 ---
 
 ## Run Locally
 
+### Frontend
+
 ```bash
 cd frontend
+cp .env.example .env
 npm install --legacy-peer-deps
 npm run dev
 ```
 
-The frontend connects to the deployed `zkaccess_v3.aleo` on Aleo Testnet.
+### KYC Bridge Backend
 
-### Deploy the program yourself
+```bash
+cd backend
+cp .env.example .env
+# Edit .env with your Sumsub credentials (https://sumsub.com → Dashboard → Developers)
+npm install
+npm run dev
+```
+
+The backend requires:
+- **Sumsub account** — sign up free at [sumsub.com](https://sumsub.com), get App Token + Secret Key from Dashboard > Developers
+- **Aleo issuer key** (optional) — for auto-credential issuance; omit for manual mode
+
+### Deploy Contract
 
 ```bash
 cd zkaccess
 leo build
-leo deploy --private-key YOUR_KEY --network testnet \
-  --endpoint "https://api.explorer.provable.com/v1" \
-  --broadcast --priority-fees 5000000 --yes
+export ALEO_PRIVATE_KEY="YOUR_PRIVATE_KEY"
+./deploy_testnet.sh
 ```
 
 After deployment:
 1. Call `initialize_admin` to set yourself as admin
-2. Call `register_issuer` with your address to authorize yourself as an issuer
-3. Optionally create a demo gate with `create_gate`
-
----
-
-## Wave 3 Progress Changelog
-
-### What changed since Wave 2
-
-**Smart Contract (complete rewrite):**
-- **Collapsed from 5 simple transitions to 12 async transitions with on-chain finalization**
-- Added **7 on-chain mappings** (admin, authorized_issuers, revoked_credentials, gates, gate_owners, gate_counter, proof_registry)
-- **Issuer authorization**: only admin-approved issuers can create credentials (fixed the trust model)
-- **Credential expiration**: credentials have a validity period based on block height
-- **Credential revocation**: admin/issuers can revoke credentials, revoked credentials can't generate proofs
-- **ZK-Gates** (new feature): programmable access gates with custom requirements
-- **`pass_gate` transition**: privately prove credential meets all gate requirements at once
-- **`prove_single` transition**: unified single-claim proof with revocation/expiration checks
-- **On-chain proof registry**: proofs recorded in mapping for third-party verification
-- **`verify_proof` transition**: anyone can verify a proof exists on-chain
-- Every transition uses **async/finalize** pattern — private computation + public validation
-
-**Frontend:**
-- **2 new pages**: Gates (create/browse access gates) and Admin (issuer management)
-- **Issue page**: added validity period selector, issuer authorization status check
-- **Credentials page**: shows expiration status, revocation status, credential IDs
-- **Prove page**: added "ZK-Gate Access" proof mode alongside single proofs, gate config lookup
-- **Verify page**: complete rewrite — real third-party proof verification via mapping query + activity tab
-- **Home page**: updated messaging to "ZK-Gated Access Control Protocol", added use cases section
-- **Navbar**: added Gates and Admin (conditional) links
-- Frontend queries **on-chain mappings** via Aleo REST API for real-time data
-
-### Feedback incorporated
-- "Broken trust model" → Issuer authorization with mapping + admin role
-- "No on-chain state" → 7 mappings, every transition uses async/finalize
-- "Verify page is just tx history" → Real proof verification + activity tabs
-- "Not novel enough" → ZK-Gated Access Control Protocol (programmable gates)
-- "No credential expiration" → Block height based expiration + revocation
-
-### Next wave goals
-- Mainnet deployment
-- Credential delegation (share proofs across wallets)
-- Multi-gate composition (pass multiple gates atomically)
-- Gate marketplace / directory
-- Integration with credits.aleo for gate access fees
+2. Call `register_issuer` with your address to authorize yourself as issuer
+3. Create demo gates using the DeFi compliance templates
 
 ---
 
@@ -271,18 +343,57 @@ After deployment:
 ```
 aleo-zk/
 ├── zkaccess/
-│   ├── src/main.leo          # Leo program (~300 lines, 12 transitions, 7 mappings)
+│   ├── src/main.leo              # Leo program (12 transitions, 8 mappings)
+│   ├── build/main.aleo           # Compiled AVM bytecode
+│   ├── deploy_testnet.sh         # Testnet deployment script
 │   └── program.json
-├── frontend/
+├── backend/                      # KYC Bridge (Sumsub integration)
 │   ├── src/
-│   │   ├── main.tsx          # AleoWalletProvider + WalletModalProvider
-│   │   ├── context/          # WalletContext (executeTransaction, queryMapping, isAdmin)
-│   │   ├── pages/            # Home, Issue, Credentials, Prove, Gates, Verify, Admin
-│   │   ├── components/       # Navbar, Layout, ToastContainer
-│   │   └── types/            # TypeScript types (GateConfig, ParsedCredential, etc.)
+│   │   ├── index.ts              # Express server — token gen, webhooks, status API
+│   │   ├── config.ts             # Environment config (Sumsub + Aleo)
+│   │   ├── store.ts              # Verification state store
+│   │   └── services/
+│   │       ├── fractal.ts        # Sumsub API — HMAC auth, applicant data, webhooks
+│   │       └── aleo.ts           # Aleo credential issuance service
+│   ├── .env.example
+│   └── package.json
+├── frontend/                     # React 18 + TypeScript + Tailwind 4
+│   ├── src/
+│   │   ├── pages/                # Home, KYC, Issue, Credentials, Prove, Gates, Verify, Admin
+│   │   ├── context/              # WalletContext (transactions, mappings, admin)
+│   │   ├── components/           # Navbar, Layout, ToastContainer
+│   │   └── types/                # TypeScript interfaces
+│   ├── .env.example
 │   └── package.json
 └── README.md
 ```
+
+---
+
+## Wave 4 Changelog
+
+### What's New Since Wave 3
+
+**Real KYC Integration (Sumsub):**
+- **Backend KYC bridge service** — Express server with Sumsub HMAC-authenticated API, webhook processing, credential issuance
+- **Embedded Sumsub WebSDK** — real government ID scanning, liveness detection, sanctions screening directly in the app (user never leaves)
+- **Auto-credential issuance** — backend webhook extracts verified KYC data and issues on-chain credentials automatically
+- **New KYC page** — 3-step verification flow with embedded widget, live status polling, pipeline visualization
+
+**DeFi Compliance Focus:**
+- **Pre-built gate templates** — OFAC-Compliant DEX, SEC Accredited Pool, Age-Gated DeFi, Global KYC
+- **Updated use cases** — SEC accredited access, OFAC-compliant DeFi, age-gated finance
+- **Home page redesign** — DeFi compliance narrative with real KYC integration pipeline
+
+**Architecture:**
+- **3-tier architecture** — Frontend (with embedded KYC widget) + KYC Bridge Backend + Aleo smart contract
+- **Dual issuance modes** — automated (backend with SDK) or manual (wallet-based with verified data)
+- **Webhook support** — real-time verification result callbacks from Sumsub
+
+### Previous feedback addressed
+- "Deploy the latest v3 contract" → v3 deployed on testnet
+- "Consider integration with actual KYC providers" → Sumsub (production KYC provider — Binance, MoonPay, Bybit)
+- "Gate system for DeFi protocol compliance is promising" → Pre-built DeFi compliance templates, real regulatory scenarios
 
 ---
 
@@ -292,4 +403,4 @@ MIT
 
 ---
 
-Built for [Aleo](https://aleo.org) | [Shield Wallet](https://shield.app) | [AleoScan](https://testnet.aleoscan.io/program?id=zkaccess_v3.aleo)
+Built for [Aleo](https://aleo.org) | KYC by [Sumsub](https://sumsub.com) | [Shield Wallet](https://shield.app) | [AleoScan](https://testnet.aleoscan.io/program?id=zkaccess_v3.aleo)

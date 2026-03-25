@@ -1,60 +1,60 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, CheckCircle, Zap, Search } from 'lucide-react'
+import { Shield, FileCheck, Eye, Lock, ArrowRight, Fingerprint, Zap, Search, ShieldCheck } from 'lucide-react'
 import { queryMapping, useWallet } from '../context/WalletContext'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const FEATURES = [
   {
-    title: 'Issue Credentials',
-    desc: 'Authorized issuers create encrypted credential records with expiration. Only the owner can decrypt them.',
-    color: 'var(--color-coral)',
-    icon: FileCheck,
-    link: '/issue',
+    title: 'Real KYC Verification',
+    desc: 'Verify your identity through Sumsub — real ID document scanning, liveness detection, and sanctions screening.',
+    color: 'var(--color-sky)',
+    icon: ShieldCheck,
+    link: '/kyc',
   },
   {
-    title: 'ZK-Gated Access',
-    desc: 'Create access gates with custom requirements. Users prove eligibility without revealing personal data.',
+    title: 'Encrypted Credentials',
+    desc: 'KYC-verified data becomes an encrypted on-chain credential. Only you can decrypt it — issuers and services never see raw data.',
+    color: 'var(--color-coral)',
+    icon: FileCheck,
+    link: '/credentials',
+  },
+  {
+    title: 'DeFi Compliance Gates',
+    desc: 'Protocols create gates for accredited investors, OFAC compliance, age verification. Users pass them with ZK proofs.',
     color: 'var(--color-mint)',
     icon: Lock,
     link: '/gates',
   },
   {
-    title: 'Prove Privately',
-    desc: 'Generate proofs that reveal only pass/fail. Your age, country, and identity stay hidden.',
+    title: 'Prove Without Revealing',
+    desc: 'Generate zero-knowledge proofs that reveal only pass/fail. Your age, country, and identity stay private on-chain.',
     color: 'var(--color-purple)',
     icon: Eye,
     link: '/prove',
-  },
-  {
-    title: 'Verify On-Chain',
-    desc: 'Third parties verify proofs from the on-chain registry. No trust required — just cryptography.',
-    color: 'var(--color-lime)',
-    icon: CheckCircle,
-    link: '/verify',
   },
 ]
 
 const STEPS = [
   {
     num: '01',
-    title: 'Get a Credential',
-    desc: 'An authorized issuer creates an encrypted credential in your wallet. It contains your claims (age, KYC, country) but only you can see them. Credentials have an expiration and can be revoked.',
+    title: 'Verify with Sumsub',
+    desc: 'Complete real KYC through Sumsub — government ID scan, liveness check, sanctions screening. Your verified data (age, country, KYC status) is extracted securely.',
     icon: Fingerprint,
     color: 'var(--color-sky)',
   },
   {
     num: '02',
-    title: 'Pass a Gate',
-    desc: 'Services define access gates with requirements (18+, KYC, not restricted). You prove your credential meets them — all at once, privately. Your data never leaves your wallet.',
-    icon: Lock,
+    title: 'Get Encrypted Credential',
+    desc: 'Your verified KYC data becomes an encrypted credential on Aleo. Only you can decrypt it. It has expiration and can be revoked. No personal data is ever stored on-chain.',
+    icon: Shield,
     color: 'var(--color-mint)',
   },
   {
     num: '03',
-    title: 'Verified On-Chain',
-    desc: 'The proof is recorded on the Aleo network. Anyone can verify it happened, but nobody can see your private data. Composable, trustless, private.',
-    icon: Shield,
+    title: 'Pass DeFi Gates Privately',
+    desc: 'DeFi protocols define compliance gates (18+, KYC, accredited). You pass them with zero-knowledge proofs — the protocol learns only "approved" or "denied", never your data.',
+    icon: Lock,
     color: 'var(--color-purple)',
   },
 ]
@@ -113,28 +113,27 @@ export default function Home() {
             <span style={{ color: 'var(--color-coral)' }}>Control Protocol.</span>
           </h1>
           <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10" style={{ color: '#4b5563' }}>
-            Privacy-preserving access control on Aleo.
-            Issue credentials, create access gates, prove eligibility —
-            without ever exposing personal data.
+            Real KYC verification through Sumsub, encrypted credentials on Aleo,
+            and zero-knowledge proofs for DeFi compliance — without ever exposing personal data.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {connected ? (
               <Link
-                to="/gates"
+                to="/kyc"
                 className="brut-btn brut-btn-lg"
                 style={{ background: 'var(--color-coral)', color: 'var(--color-ink)' }}
               >
-                Explore Gates <ArrowRight size={20} strokeWidth={2.5} />
+                Verify with Sumsub <ArrowRight size={20} strokeWidth={2.5} />
               </Link>
             ) : (
               <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
             )}
             <Link
-              to="/prove"
+              to="/gates"
               className="brut-btn brut-btn-lg"
               style={{ background: 'white' }}
             >
-              Generate Proof <Zap size={20} strokeWidth={2.5} />
+              Explore DeFi Gates <Zap size={20} strokeWidth={2.5} />
             </Link>
           </div>
           {/* Stats */}
@@ -323,9 +322,9 @@ export default function Home() {
         </h2>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { title: 'DeFi Access Control', desc: 'Lending protocols require accredited investors. Users prove eligibility privately — no KYC documents shared.', icon: Shield, color: 'var(--color-coral)' },
-            { title: 'Token-Gated Content', desc: 'Gate premium content behind age verification or membership proofs. Users prove access rights without doxxing.', icon: Lock, color: 'var(--color-amber)' },
-            { title: 'Compliance Without Exposure', desc: 'Meet regulatory requirements through selective disclosure. Prove jurisdiction compliance without revealing location.', icon: Search, color: 'var(--color-sky)' },
+            { title: 'SEC Accredited Access', desc: 'Lending pools and investment DAOs require accredited investors. Users prove eligibility via Sumsub KYC — no income docs shared.', icon: Shield, color: 'var(--color-coral)' },
+            { title: 'OFAC-Compliant DeFi', desc: 'DEXs and bridges gate access to non-restricted countries. Users prove jurisdiction compliance without revealing their location.', icon: Search, color: 'var(--color-sky)' },
+            { title: 'Age-Gated Finance', desc: 'Financial products requiring 18+ or 21+ access. Real age verification via government ID, proven on-chain with zero knowledge.', icon: Lock, color: 'var(--color-amber)' },
           ].map(uc => (
             <div key={uc.title} className="brut-card-static bg-white p-6">
               <uc.icon size={28} strokeWidth={2.5} style={{ color: uc.color }} className="mb-3" />
