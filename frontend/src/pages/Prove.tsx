@@ -5,6 +5,9 @@ import { Zap, ArrowRight, AlertTriangle, CheckCircle, ExternalLink, RefreshCw, L
 import type { ProofType, GateConfig } from '../types'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+const CLAIM_TYPE_MAP_BACKEND: Record<string, number> = { age: 1, kyc: 2, country: 3, accredited: 4 }
+
 const PROOF_TYPES: { value: ProofType; label: string; desc: string; color: string; fn: string }[] = [
   { value: 'age', label: 'Age Minimum', desc: 'Prove you meet a minimum age requirement', color: 'var(--color-coral)', fn: 'prove_single' },
   { value: 'kyc', label: 'KYC Status', desc: 'Prove your identity has been KYC verified', color: 'var(--color-purple)', fn: 'prove_single' },
@@ -13,12 +16,7 @@ const PROOF_TYPES: { value: ProofType; label: string; desc: string; color: strin
   { value: 'gate', label: 'ZK-Gate Access', desc: 'Prove you meet all requirements of an access gate', color: 'var(--color-mint)', fn: 'pass_gate' },
 ]
 
-const CLAIM_TYPE_MAP: Record<string, number> = {
-  age: 1,
-  kyc: 2,
-  country: 3,
-  accredited: 4,
-}
+
 
 function isCredentialRecord(record: Record<string, unknown>): boolean {
   const candidates = [
@@ -245,39 +243,62 @@ export default function Prove() {
     setExplorerTxId(null)
 
     const record = records[selectedRecord]
-    const proofConfig = PROOF_TYPES.find(p => p.value === proofType)!
 
-    // Shield wallet needs recordCiphertext; other wallets need plaintext
-    const recordStr = (record.recordCiphertext as string)
-      || toRecordInput(record)
+    // prove_single consumes a record — Shield wallet can't broadcast record-consuming txs.
+    // Route through backend which uses Leo CLI (handles state path lookup automatically).
+    if (proofType !== 'gate') {
+      const recordPlaintext = record.recordPlaintext as string | undefined
+      if (!recordPlaintext) {
+        addToast('Credential plaintext not available — refresh and try again', 'error')
+        setLoading(false)
+        return
+      }
+
+      try {
+        const claimType = CLAIM_TYPE_MAP_BACKEND[proofType] || 2
+        const minAge = proofType === 'age' ? minimumAge : 0
+        addToast('Generating ZK proof on-chain… this takes ~60s', 'info')
+
+        const res = await fetch(`${BACKEND_URL}/api/prove`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recordPlaintext, claimType, minAge }),
+        })
+        const data = await res.json() as { txId?: string; error?: string }
+        if (!res.ok || data.error) throw new Error(data.error || 'Proof failed')
+
+        setTxId(data.txId ?? 'confirmed')
+        setExplorerTxId(data.txId?.startsWith('at1') ? data.txId : null)
+      } catch (err) {
+        addToast(err instanceof Error ? err.message : 'Proof generation failed', 'error')
+      }
+      setLoading(false)
+      return
+    }
+
+    // pass_gate — still uses wallet (gate proofs via wallet for now)
+    const proofConfig = PROOF_TYPES.find(p => p.value === proofType)!
+    const recordStr = (record.recordCiphertext as string) || toRecordInput(record)
     if (!recordStr) {
       addToast('Selected credential format is not supported by wallet', 'error')
       setLoading(false)
       return
     }
 
-    let inputs: string[]
-
-    if (proofType === 'gate') {
-      if (!gateConfig) {
-        addToast('Please look up a gate first', 'error')
-        setLoading(false)
-        return
-      }
-      const gateField = gateConfig.gateId.endsWith('field') ? gateConfig.gateId : `${gateConfig.gateId}field`
-      inputs = [
-        recordStr,
-        gateField,
-        `${gateConfig.minAge}u8`,
-        `${gateConfig.requireKyc}`,
-        `${gateConfig.requireNotRestricted}`,
-        `${gateConfig.requireAccredited}`,
-      ]
-    } else {
-      const claimType = CLAIM_TYPE_MAP[proofType] || 1
-      const minAge = proofType === 'age' ? minimumAge : 0
-      inputs = [recordStr, `${claimType}u8`, `${minAge}u8`]
+    if (!gateConfig) {
+      addToast('Please look up a gate first', 'error')
+      setLoading(false)
+      return
     }
+    const gateField = gateConfig.gateId.endsWith('field') ? gateConfig.gateId : `${gateConfig.gateId}field`
+    const inputs = [
+      recordStr,
+      gateField,
+      `${gateConfig.minAge}u8`,
+      `${gateConfig.requireKyc}`,
+      `${gateConfig.requireNotRestricted}`,
+      `${gateConfig.requireAccredited}`,
+    ]
 
     const result = await executeTransition(proofConfig.fn, inputs, undefined, [0])
     setTxId(result?.id ?? null)
@@ -377,26 +398,40 @@ export default function Prove() {
         </div>
         {records.length > 0 ? (
           <div className="space-y-3">
-            {records.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setSelectedRecord(i)}
-                className="w-full text-left rounded-xl p-4 transition-all"
-                style={{
-                  border: selectedRecord === i ? '3px solid var(--color-ink)' : '3px solid #e5e7eb',
-                  boxShadow: selectedRecord === i ? '4px 4px 0 0 var(--color-ink)' : 'none',
-                  background: selectedRecord === i ? 'var(--color-mint)' : 'white',
-                }}
-              >
-                <div className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Credential #{i + 1}
-                </div>
-                <div className="text-xs mt-1" style={{ opacity: 0.7 }}>
-                  On-chain record from your wallet
-                </div>
-              </button>
-            ))}
+            {records.map((rec, i) => {
+              const pt = typeof rec.recordPlaintext === 'string' ? rec.recordPlaintext : ''
+              const getField = (key: string) => { const m = pt.match(new RegExp(`${key}:\\s*([^.,\\n}]+)`)); return m ? m[1].trim() : null }
+              const age = parseInt(getField('age')?.replace('u8','') || '0') || 0
+              const country = parseInt(getField('country_code')?.replace('u16','') || '0') || 0
+              const kyc = getField('kyc_passed') === 'true'
+              const hasData = pt.length > 0
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSelectedRecord(i)}
+                  className="w-full text-left rounded-xl p-4 transition-all"
+                  style={{
+                    border: selectedRecord === i ? '3px solid var(--color-ink)' : '3px solid #e5e7eb',
+                    boxShadow: selectedRecord === i ? '4px 4px 0 0 var(--color-ink)' : 'none',
+                    background: selectedRecord === i ? 'var(--color-mint)' : 'white',
+                  }}
+                >
+                  <div className="font-bold text-sm" style={{ fontFamily: 'var(--font-heading)' }}>
+                    Credential #{i + 1}
+                  </div>
+                  {hasData ? (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="brut-badge text-xs" style={{ background: 'var(--color-coral)', fontSize: '0.6rem' }}>Age {age}</span>
+                      <span className="brut-badge text-xs" style={{ background: 'var(--color-sky)', fontSize: '0.6rem' }}>Country {country}</span>
+                      <span className="brut-badge text-xs" style={{ background: kyc ? 'var(--color-lime)' : '#fee2e2', fontSize: '0.6rem' }}>{kyc ? 'KYC ✓' : 'KYC ✗'}</span>
+                    </div>
+                  ) : (
+                    <div className="text-xs mt-1" style={{ opacity: 0.7 }}>On-chain record from your wallet</div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         ) : (
           <div className="text-center py-6">

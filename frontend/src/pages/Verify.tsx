@@ -23,7 +23,7 @@ export default function Verify() {
   const [activeTab, setActiveTab] = useState<Tab>('verify')
   const [subjectAddress, setSubjectAddress] = useState('')
   const [verifying, setVerifying] = useState(false)
-  const [verifyResult, setVerifyResult] = useState<{ found: boolean; blockHeight?: string } | null>(null)
+  const [verifyResult, setVerifyResult] = useState<{ found: boolean; blockHeight?: string; hasCredential?: boolean } | null>(null)
 
   const handleVerify = async () => {
     if (!subjectAddress.trim()) return
@@ -31,23 +31,48 @@ export default function Verify() {
     setVerifyResult(null)
 
     try {
-      // We need to compute BHP256::hash_to_field(address) to look up the proof_registry.
-      // Since this requires the SDK, we'll try to query the mapping directly with the address.
-      // The on-chain key is the hash, so we try the address as a direct key first.
-      // For a production app, we'd compute the hash client-side.
-      // Alternative: we query the proof_registry mapping with the hashed key.
-      // Since we can't easily hash in the browser without the SDK, we check if
-      // there was a successful pass_gate or prove_single transaction for this address.
+      const addr = subjectAddress.trim()
 
-      // Try querying with the address directly (works if proof_key happens to be stored as address)
-      const result = await queryMapping('proof_registry', subjectAddress.trim())
+      // The on-chain proof key is BHP256::hash_to_field(address).
+      // This hash equals the credential_id computed during issue_credential,
+      // because the contract uses BHP256::hash_to_field(recipient) for both.
+      // We attempt both the raw address and common hash formats.
 
-      if (result && result !== 'null' && result !== '') {
-        const height = result.replace('u32', '').trim()
-        setVerifyResult({ found: true, blockHeight: height })
-      } else {
-        setVerifyResult({ found: false })
+      // Strategy 1: query using credential_id from known credentials (same hash)
+      // Strategy 2: try the address itself as a field element
+      // Strategy 3: try with "field" suffix
+
+      const candidates = [
+        addr,
+        addr.endsWith('field') ? addr : `${addr}field`,
+      ]
+
+      // Also check if it's a field value directly (user pastes the proof key hash)
+      let found = false
+      let blockHeight: string | undefined
+
+      for (const key of candidates) {
+        const result = await queryMapping('proof_registry', key)
+        if (result && result !== 'null' && result !== '') {
+          const height = result.replace('u32', '').trim()
+          found = true
+          blockHeight = height
+          break
+        }
       }
+
+      // Also try querying credentials_issued to confirm this address has a credential
+      if (!found) {
+        const credResult = await queryMapping('credentials_issued', addr)
+        if (credResult && credResult !== 'null' && credResult !== '') {
+          // Has a credential but proof not yet generated
+          setVerifyResult({ found: false, hasCredential: true })
+          setVerifying(false)
+          return
+        }
+      }
+
+      setVerifyResult({ found, blockHeight, hasCredential: found })
     } catch {
       setVerifyResult({ found: false })
     }
@@ -97,20 +122,23 @@ export default function Verify() {
               Third-Party Proof Verification
             </h3>
             <p className="text-sm mb-6" style={{ color: '#6b7280' }}>
-              Check if a user has successfully passed a ZK proof on-chain. Enter their Aleo address to verify.
+              Check if a user has a valid ZK proof on-chain. Enter their credential ID (shown on the Credentials page).
             </p>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-                  Subject Address
+                  Credential ID (Proof Key)
                 </label>
                 <input
                   type="text"
                   className="brut-input"
-                  placeholder="aleo1..."
+                  placeholder="4602318…field"
                   value={subjectAddress}
                   onChange={e => setSubjectAddress(e.target.value)}
                 />
+                <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+                  Copy the ID shown on the Credentials page (the truncated value under "ID").
+                </p>
               </div>
               <button
                 onClick={handleVerify}
@@ -141,16 +169,20 @@ export default function Verify() {
               </div>
               {verifyResult.found ? (
                 <div className="text-sm space-y-1">
-                  <p>This address has a valid proof recorded on-chain.</p>
+                  <p>This address has a valid ZK proof recorded on-chain.</p>
                   {verifyResult.blockHeight && (
                     <p className="font-mono text-xs" style={{ opacity: 0.8 }}>
-                      Proof recorded at block #{verifyResult.blockHeight}
+                      Proof recorded at block #{parseInt(verifyResult.blockHeight).toLocaleString()}
                     </p>
                   )}
                 </div>
+              ) : verifyResult.hasCredential ? (
+                <p className="text-sm">
+                  This address has a KYC credential but has not yet generated an on-chain proof. Ask them to visit the Prove page.
+                </p>
               ) : (
                 <p className="text-sm">
-                  No proof was found for this address in the on-chain registry. The user may not have generated a proof yet, or the proof key format may differ.
+                  No proof found for this address. The user may not have completed KYC or generated a proof yet.
                 </p>
               )}
             </div>

@@ -255,7 +255,23 @@ export default function Credentials() {
                     </div>
                   )}
                 </div>
-                <div className="px-6 pb-6">
+                <div className="px-6 pb-6 space-y-2">
+                  {(() => {
+                    const txId = typeof (cred.raw as Record<string,unknown>).transactionId === 'string'
+                      ? ((cred.raw as Record<string,unknown>).transactionId as string).trim()
+                      : null
+                    return txId && txId.startsWith('at1') ? (
+                      <a
+                        href={`https://testnet.aleoscan.io/transaction?id=${txId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="brut-btn w-full text-xs"
+                        style={{ background: 'white', fontSize: '0.75rem' }}
+                      >
+                        View on AleoScan <ExternalLink size={12} />
+                      </a>
+                    ) : null
+                  })()}
                   <Link
                     to="/prove"
                     className="brut-btn w-full"

@@ -1,5 +1,10 @@
 import { config } from '../config.js'
 import type { VerificationData } from '../store.js'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import path from 'path'
+
+const execFileAsync = promisify(execFile)
 
 export class AleoService {
   private apiBase: string
@@ -25,6 +30,43 @@ export class AleoService {
     } catch {
       return null
     }
+  }
+
+  // Uses Leo CLI to execute prove_single or pass_gate (record-consuming transitions).
+  // Shell wallet cannot broadcast these — the CLI handles state path lookup automatically.
+  async proveCredential(params: {
+    recordPlaintext: string  // Full Aleo record plaintext string from wallet
+    claimType: number        // 1=age, 2=kyc, 3=country, 4=accredited
+    minAge?: number
+  }): Promise<string> {
+    if (!config.aleo.issuerPrivateKey) {
+      throw new Error('ALEO_ISSUER_PRIVATE_KEY not configured')
+    }
+
+    const { recordPlaintext, claimType, minAge = 0 } = params
+    const leoProjectDir = path.resolve(process.cwd(), '../zkaccess')
+
+    const { stdout, stderr } = await execFileAsync('leo', [
+      'execute', 'prove_single',
+      recordPlaintext,
+      `${claimType}u8`,
+      `${minAge}u8`,
+      '--private-key', config.aleo.issuerPrivateKey,
+      '--network', config.aleo.network,
+      '--endpoint', config.aleo.apiEndpoint,
+      '--yes', '--broadcast',
+    ], {
+      cwd: leoProjectDir,
+      timeout: 300_000,
+      maxBuffer: 10 * 1024 * 1024,
+    })
+
+    console.log('[aleo] prove_single stdout:', stdout.slice(-500))
+    if (stderr) console.warn('[aleo] prove_single stderr:', stderr.slice(-200))
+
+    const txMatch = stdout.match(/transaction ID: '(at1[a-z0-9]+)'/)
+    if (!txMatch) throw new Error(`prove_single succeeded but no TX ID found in output:\n${stdout.slice(-300)}`)
+    return txMatch[1]
   }
 
   async issueCredential(params: {

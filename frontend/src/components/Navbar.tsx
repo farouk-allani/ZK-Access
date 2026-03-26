@@ -12,7 +12,6 @@ export default function Navbar() {
   const NAV_LINKS = [
     { to: '/', label: 'Home' },
     { to: '/kyc', label: 'KYC' },
-    { to: '/issue', label: 'Issue' },
     { to: '/credentials', label: 'Credentials' },
     { to: '/prove', label: 'Prove' },
     { to: '/gates', label: 'Gates' },
@@ -58,7 +57,7 @@ export default function Navbar() {
             {connected && address && (
               <div
                 className="brut-badge hidden sm:inline-flex"
-                style={{ background: 'var(--color-mint)', fontSize: '0.75rem' }}
+                // style={{ background: 'var(--color-mint)', fontSize: '0.75rem' }}
               >
                 <div className="w-2 h-2 rounded-full bg-ink" />
                 {address.slice(0, 8)}...{address.slice(-4)}

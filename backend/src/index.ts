@@ -222,6 +222,36 @@ app.post('/api/kyc/issue', async (req, res) => {
   })
 })
 
+// ─── Generate ZK Proof via CLI (wallet cannot consume records) ───────
+app.post('/api/prove', async (req, res) => {
+  const { recordPlaintext, claimType, minAge = 0 } = req.body
+  if (!recordPlaintext || !claimType) {
+    res.status(400).json({ error: 'recordPlaintext and claimType required' })
+    return
+  }
+  if (!config.aleo.issuerPrivateKey) {
+    res.status(503).json({ error: 'Issuer private key not configured' })
+    return
+  }
+
+  try {
+    console.log(`[prove] Generating proof: claimType=${claimType}, minAge=${minAge}`)
+    const txId = await aleo.proveCredential({ recordPlaintext, claimType: Number(claimType), minAge: Number(minAge) })
+    console.log(`[prove] Proof confirmed on-chain: ${txId}`)
+    res.json({ status: 'confirmed', txId })
+  } catch (err) {
+    const msg = String(err)
+    console.error('[prove] Failed:', msg)
+    if (msg.includes('already exists in the ledger')) {
+      res.status(400).json({ error: 'This credential has already been used (spent). Please select a different credential from your wallet.' })
+    } else if (msg.includes('expires_at') || msg.includes('expired')) {
+      res.status(400).json({ error: 'This credential has expired. Please issue a new credential first.' })
+    } else {
+      res.status(500).json({ error: 'Proof generation failed. ' + msg.slice(0, 200) })
+    }
+  }
+})
+
 // ─── Pending Verifications (issuer dashboard) ────────────────────────
 app.get('/api/kyc/pending', (_req, res) => {
   const all = store.getAll()

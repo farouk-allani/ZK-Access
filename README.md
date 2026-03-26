@@ -35,6 +35,38 @@ Real KYC (Sumsub) → Encrypted Credential (Aleo) → ZK-Gated Access (Zero Know
 
 ---
 
+## Product-Market Fit & Go-To-Market
+
+### Who needs this
+
+| Segment | Pain | ZK-Access solves |
+|---------|------|-----------------|
+| **DeFi protocols** (DEXs, lending, DAOs) | Regulatory pressure to KYC users without killing privacy | On-chain gate: users prove compliance, protocol sees boolean only |
+| **Institutional DeFi** (real-world assets, tokenized securities) | SEC/OFAC/AML requirements with privacy-conscious users | Accredited investor proofs + OFAC checks, no data stored |
+| **Crypto exchanges / on-ramps** | Per-transaction KYC too expensive, once-per-user needed | Reusable credential: verify once with Sumsub, prove anywhere |
+| **Web3 gaming & token launches** | Age gates, jurisdiction blocks, KYC required for regulated tokens | Age + country proofs without passport on-chain |
+
+### Why now
+
+- FATF travel rule enforcement is expanding to DeFi in 2025-2026
+- SEC is actively pursuing unregistered securities in DeFi pools
+- No current solution lets users prove compliance privately — it's either KYC theater (OpenSea) or no KYC at all
+
+### Go-To-Market plan
+
+**Phase 1 — Developer adoption (current):**
+Deploy on Aleo testnet, publish open-source SDK. Target Aleo ecosystem DeFi projects building compliance-sensitive protocols.
+
+**Phase 2 — Integration partnerships:**
+Partner with 2-3 Aleo DeFi projects (DEXs, lending protocols) to integrate `pass_gate` into their access control. Gate templates reduce integration to a 1-line check.
+
+**Phase 3 — KYC provider expansion:**
+Add Veriff and Onfido alongside Sumsub for enterprise clients requiring specific providers. Charge protocols a per-verification SaaS fee (~$0.10-0.50/proof).
+
+**Revenue model:** Protocol subscription (fixed monthly) + per-verification fee on high-volume routes.
+
+---
+
 ## Architecture
 
 ```
@@ -276,7 +308,7 @@ Protocols can also create custom gates with any combination of requirements.
 4. **Receive Credential** — After KYC approval, issue your encrypted credential with verified data
 5. **Create DeFi Gate** — Go to Gates, use "OFAC-Compliant DEX" template, create gate on-chain
 6. **Pass Gate Privately** — Go to Prove, select credential, enter gate ID, generate ZK proof
-7. **Verify On-Chain** — Go to Verify, enter your address, confirm proof exists in registry
+7. **Verify On-Chain** — Go to Verify, paste your Credential ID (shown on Credentials page), confirm proof exists in registry
 
 Every action is a real Aleo transaction with async finalization. **No mocks. Real KYC. Real ZK proofs.**
 
@@ -291,7 +323,7 @@ Every action is a real Aleo transaction with async finalization. **No mocks. Rea
 7. After verification, issue credential with KYC-verified data
 8. Gates, use "OFAC-Compliant DEX" template, create gate
 9. Prove, select credential, pass gate with ZK proof
-10. Verify, enter your address, confirm proof exists
+10. Verify, paste your Credential ID, confirm proof exists in registry
 
 **Expected:** Sumsub verification (in-app widget) -> encrypted credential -> ZK gate pass -> on-chain proof. Full privacy pipeline.
 
@@ -389,6 +421,14 @@ aleo-zk/
 - **3-tier architecture** — Frontend (with embedded KYC widget) + KYC Bridge Backend + Aleo smart contract
 - **Dual issuance modes** — automated (backend with SDK) or manual (wallet-based with verified data)
 - **Webhook support** — real-time verification result callbacks from Sumsub
+
+### Wave 5 Goals
+
+- **`pass_gate` end-to-end demo** — full ZK-Gate flow (credential → gate → on-chain access token) with verifiable proof on AleoScan
+- **Mainnet deployment** — deploy `zkaccess_v3.aleo` to Aleo mainnet once available
+- **SDK / npm package** — publish `@zk-access/client` for DeFi protocol integration (1-line gate check)
+- **Webhook-driven auto-issuance** — fully automated pipeline from Sumsub approval to on-chain credential without manual step
+- **Credential renewal** — allow users to renew expiring credentials without new KYC verification
 
 ### Previous feedback addressed
 - "Deploy the latest v3 contract" → v3 deployed on testnet
