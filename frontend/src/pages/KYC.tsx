@@ -25,7 +25,7 @@ interface KycStatus {
 
 export default function KYC() {
   const { connected, address, executeTransition } = useWallet()
-  const [searchParams] = useSearchParams()
+  const [_searchParams] = useSearchParams()
   const [kycStatus, setKycStatus] = useState<KycStatus>({ status: 'none' })
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null)
   const [issuing, setIssuing] = useState(false)
