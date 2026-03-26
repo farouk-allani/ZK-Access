@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: zkaccess-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: SUMSUB_APP_TOKEN
+        sync: false
+      - key: SUMSUB_SECRET_KEY
+        sync: false
+      - key: SUMSUB_LEVEL_NAME
+        value: id-and-liveness
+      - key: SUMSUB_WEBHOOK_SECRET
+        sync: false
+      - key: ALEO_ISSUER_PRIVATE_KEY
+        sync: false
+      - key: ALEO_PROGRAM_ID
+        value: zkaccess_v3.aleo
+      - key: ALEO_API_ENDPOINT
+        value: https://api.explorer.provable.com/v1
+      - key: ALEO_NETWORK
+        value: testnet
+      - key: FRONTEND_URL
+        sync: false

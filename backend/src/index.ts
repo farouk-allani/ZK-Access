@@ -9,7 +9,21 @@ const app = express()
 const sumsub = new SumsubService()
 const aleo = new AleoService()
 
-app.use(cors({ origin: config.frontendUrl, credentials: true }))
+const allowedOrigins = [
+  config.frontendUrl,
+  'http://localhost:5173',
+  'http://localhost:4173',
+]
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o.replace(/\/$/, ''))) || origin.includes('.vercel.app')) {
+      cb(null, true)
+    } else {
+      cb(null, true) // Allow all for hackathon
+    }
+  },
+  credentials: true,
+}))
 app.use(express.json())
 app.use(express.text({ type: 'application/json' })) // for webhook signature verification
 
