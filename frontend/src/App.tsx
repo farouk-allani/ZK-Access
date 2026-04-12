@@ -19,6 +19,7 @@ import Verify from './pages/Verify'
 import Gates from './pages/Gates'
 import Admin from './pages/Admin'
 import KYC from './pages/KYC'
+import DexDemo from './pages/DexDemo'
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/verify" element={<Verify />} />
           <Route path="/gates" element={<Gates />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/dex-demo" element={<DexDemo />} />
         </Routes>
       </Layout>
     </AppProvider>

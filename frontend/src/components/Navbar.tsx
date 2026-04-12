@@ -15,6 +15,7 @@ export default function Navbar() {
     { to: '/credentials', label: 'Credentials' },
     { to: '/prove', label: 'Prove' },
     { to: '/gates', label: 'Gates' },
+    { to: '/dex-demo', label: 'DEX Demo' },
     { to: '/verify', label: 'Verify' },
     { to: '/admin', label: 'Admin' },
   ]

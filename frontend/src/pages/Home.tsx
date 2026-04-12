@@ -6,29 +6,36 @@ import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 
 const FEATURES = [
   {
-    title: 'Real KYC Verification',
-    desc: 'Verify your identity through Sumsub — real ID document scanning, liveness detection, and sanctions screening.',
+    title: 'ZK-Gated DEX Demo',
+    desc: 'Live working demo of a DeFi DEX using compliance gates. Shows exactly how protocols integrate ZK-Access in 3 lines of code.',
+    color: 'var(--color-lime)',
+    icon: Zap,
+    link: '/dex-demo',
+  },
+  {
+    title: 'Protocol Compliance Gates',
+    desc: 'DeFi protocols define requirements — 18+, KYC, jurisdiction, accredited status. Users pass gates with ZK proofs. Protocols see approved/denied only.',
     color: 'var(--color-sky)',
     icon: ShieldCheck,
+    link: '/gates',
+  },
+  {
+    title: 'Real KYC via Sumsub',
+    desc: 'Government ID scanning, liveness detection, sanctions screening. Production KYC used by Binance, MoonPay, Bybit — embedded directly in the app.',
+    color: 'var(--color-coral)',
+    icon: FileCheck,
     link: '/kyc',
   },
   {
     title: 'Encrypted Credentials',
-    desc: 'KYC-verified data becomes an encrypted on-chain credential. Only you can decrypt it — issuers and services never see raw data.',
-    color: 'var(--color-coral)',
-    icon: FileCheck,
+    desc: 'KYC-verified data becomes an encrypted on-chain credential. Only the user can decrypt it. Reusable across any integrated protocol.',
+    color: 'var(--color-mint)',
+    icon: Lock,
     link: '/credentials',
   },
   {
-    title: 'DeFi Compliance Gates',
-    desc: 'Protocols create gates for accredited investors, OFAC compliance, age verification. Users pass them with ZK proofs.',
-    color: 'var(--color-mint)',
-    icon: Lock,
-    link: '/gates',
-  },
-  {
     title: 'Prove Without Revealing',
-    desc: 'Generate zero-knowledge proofs that reveal only pass/fail. Your age, country, and identity stay private on-chain.',
+    desc: 'Generate zero-knowledge proofs that reveal only pass/fail. Your age, country, and identity never appear on-chain — not to the protocol, not to anyone.',
     color: 'var(--color-purple)',
     icon: Eye,
     link: '/prove',
@@ -38,22 +45,22 @@ const FEATURES = [
 const STEPS = [
   {
     num: '01',
-    title: 'Verify with Sumsub',
-    desc: 'Complete real KYC through Sumsub — government ID scan, liveness check, sanctions screening. Your verified data (age, country, KYC status) is extracted securely.',
+    title: 'User Verifies with Sumsub',
+    desc: 'User completes real KYC through Sumsub — government ID scan, liveness check, sanctions screening. Verified data (age, country, KYC status) is extracted securely.',
     icon: Fingerprint,
     color: 'var(--color-sky)',
   },
   {
     num: '02',
-    title: 'Get Encrypted Credential',
-    desc: 'Your verified KYC data becomes an encrypted credential on Aleo. Only you can decrypt it. It has expiration and can be revoked. No personal data is ever stored on-chain.',
+    title: 'Encrypted Credential Issued',
+    desc: 'Verified KYC data becomes an encrypted credential on Aleo. Only the user can decrypt it. Has expiration and revocation. No personal data stored on-chain.',
     icon: Shield,
     color: 'var(--color-mint)',
   },
   {
     num: '03',
-    title: 'Pass DeFi Gates Privately',
-    desc: 'DeFi protocols define compliance gates (18+, KYC, accredited). You pass them with zero-knowledge proofs — the protocol learns only "approved" or "denied", never your data.',
+    title: 'Protocol Gates with ZK Proofs',
+    desc: 'DeFi protocols define compliance gates. Users pass them with zero-knowledge proofs — the protocol learns only "approved" or "denied", never the user\'s data.',
     icon: Lock,
     color: 'var(--color-purple)',
   },
@@ -61,8 +68,8 @@ const STEPS = [
 
 const STATS = [
   { label: 'Transitions', value: '12' },
-  { label: 'Mappings', value: '7' },
-  { label: 'Privacy', value: '100%' },
+  { label: 'Mappings', value: '8' },
+  { label: 'KYC Provider', value: 'Sumsub' },
 ]
 
 export default function Home() {
@@ -108,34 +115,40 @@ export default function Home() {
             className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight mb-6"
             style={{ fontFamily: 'var(--font-heading)' }}
           >
-            ZK-Gated Access
+            ZK Compliance
             <br />
-            <span style={{ color: 'var(--color-coral)' }}>Control Protocol.</span>
+            <span style={{ color: 'var(--color-coral)' }}>Infrastructure.</span>
           </h1>
           <p className="text-lg sm:text-xl max-w-2xl mx-auto mb-10" style={{ color: '#4b5563' }}>
-            Real KYC verification through Sumsub, encrypted credentials on Aleo,
-            and zero-knowledge proofs for DeFi compliance — without ever exposing personal data.
+            A plug-in compliance layer for DeFi protocols. Enforce KYC, OFAC, age, and accredited-investor gates — protocols get a boolean, users keep their privacy.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            {connected ? (
-              <Link
-                to="/kyc"
-                className="brut-btn brut-btn-lg"
-                style={{ background: 'var(--color-coral)', color: 'var(--color-ink)' }}
-              >
-                Verify with Sumsub <ArrowRight size={20} strokeWidth={2.5} />
-              </Link>
-            ) : (
-              <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
-            )}
-            <Link
-              to="/gates"
-              className="brut-btn brut-btn-lg"
-              style={{ background: 'white' }}
-            >
-              Explore DeFi Gates <Zap size={20} strokeWidth={2.5} />
-            </Link>
-          </div>
+           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+             {connected ? (
+               <Link
+                 to="/dex-demo"
+                 className="brut-btn brut-btn-lg"
+                 style={{ background: 'var(--color-mint)', color: 'var(--color-ink)' }}
+               >
+                 Try DEX Demo <Zap size={20} strokeWidth={2.5} />
+               </Link>
+             ) : (
+               <WalletMultiButton className="wallet-adapter-btn-override wallet-adapter-btn-hero" />
+             )}
+             <Link
+               to="/gates"
+               className="brut-btn brut-btn-lg"
+               style={{ background: 'white' }}
+             >
+               Explore DeFi Gates <ArrowRight size={20} strokeWidth={2.5} />
+             </Link>
+             <Link
+               to="/kyc"
+               className="brut-btn brut-btn-lg"
+               style={{ background: 'var(--color-coral)', color: 'var(--color-ink)' }}
+             >
+               Verify with Sumsub
+             </Link>
+           </div>
           {/* Stats */}
           <div className="flex justify-center gap-6 mt-10">
             {STATS.map(stat => (
@@ -218,17 +231,17 @@ export default function Home() {
         <div className="marquee-track flex items-center gap-8 whitespace-nowrap" style={{ width: 'max-content' }}>
           {[...Array(2)].map((_, i) => (
             <div key={i} className="flex items-center gap-8">
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ZK-GATED ACCESS</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>COMPLIANCE INFRASTRUCTURE</span>
               <span style={{ color: 'var(--color-coral)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>PRIVACY BY DEFAULT</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ZK GATES</span>
               <span style={{ color: 'var(--color-lime)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ACCESS CONTROL PROTOCOL</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>REAL KYC</span>
               <span style={{ color: 'var(--color-amber)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ALEO BLOCKCHAIN</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>OFAC COMPLIANCE</span>
               <span style={{ color: 'var(--color-purple)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>ENCRYPTED RECORDS</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>PROVE WITHOUT REVEALING</span>
               <span style={{ color: 'var(--color-sky)' }}>&#9670;</span>
-              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>7 MAPPINGS</span>
+              <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>8 MAPPINGS</span>
               <span style={{ color: 'var(--color-pink)' }}>&#9670;</span>
               <span className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>12 TRANSITIONS</span>
               <span style={{ color: 'var(--color-mint)' }}>&#9670;</span>
@@ -243,7 +256,7 @@ export default function Home() {
           What You Can Do
         </h2>
         <p className="text-center mb-12" style={{ color: '#6b7280', maxWidth: '600px', margin: '0 auto 3rem' }}>
-          A complete access control protocol. Issue, gate, prove, verify — all with zero knowledge.
+          A complete compliance layer for DeFi. KYC, gate, prove, verify — all with zero knowledge.
         </p>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {FEATURES.map((feat) => {
@@ -278,7 +291,7 @@ export default function Home() {
       {/* Steps Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-12" style={{ fontFamily: 'var(--font-heading)' }}>
-          Three Steps to Privacy
+          How It Works
         </h2>
         <div className="grid md:grid-cols-3 gap-8">
           {STEPS.map((step) => {
@@ -322,9 +335,9 @@ export default function Home() {
         </h2>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { title: 'SEC Accredited Access', desc: 'Lending pools and investment DAOs require accredited investors. Users prove eligibility via Sumsub KYC — no income docs shared.', icon: Shield, color: 'var(--color-coral)' },
-            { title: 'OFAC-Compliant DeFi', desc: 'DEXs and bridges gate access to non-restricted countries. Users prove jurisdiction compliance without revealing their location.', icon: Search, color: 'var(--color-sky)' },
-            { title: 'Age-Gated Finance', desc: 'Financial products requiring 18+ or 21+ access. Real age verification via government ID, proven on-chain with zero knowledge.', icon: Lock, color: 'var(--color-amber)' },
+            { title: 'OFAC-Compliant DEX', desc: 'Block restricted jurisdictions without collecting user data. Protocols enforce OFAC compliance — users prove they\'re not in a sanctioned country without revealing where they live.', icon: Shield, color: 'var(--color-coral)' },
+            { title: 'SEC Accredited Pools', desc: 'Lending protocols and investment DAOs require accredited investors. Users prove eligibility via Sumsub KYC — no income documents shared on-chain.', icon: Search, color: 'var(--color-sky)' },
+            { title: 'Age-Gated Finance', desc: 'Financial products requiring 18+ or 21+ access. Real age verification via government ID, proven on-chain with zero knowledge. No birthdates stored.', icon: Lock, color: 'var(--color-amber)' },
           ].map(uc => (
             <div key={uc.title} className="brut-card-static bg-white p-6">
               <uc.icon size={28} strokeWidth={2.5} style={{ color: uc.color }} className="mb-3" />
@@ -348,10 +361,10 @@ export default function Home() {
             className="text-3xl sm:text-4xl font-bold mb-4"
             style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-cream)' }}
           >
-            Ready to prove without revealing?
+            Ready to add compliance to your protocol?
           </h2>
           <p className="mb-8" style={{ color: '#9ca3af', maxWidth: '500px', margin: '0 auto 2rem' }}>
-            Connect your wallet and experience zero-knowledge access control on Aleo.
+            One function call. Zero user data exposed. DeFi compliance without the liability.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {connected ? (
