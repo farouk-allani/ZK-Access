@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useWallet, queryMapping } from '../context/WalletContext'
-import { Lock, Unlock, ArrowRight, AlertTriangle, CheckCircle, RefreshCw, Zap, ExternalLink } from 'lucide-react'
+import { Lock, ArrowRight, AlertTriangle, CheckCircle, RefreshCw, Zap } from 'lucide-react'
 import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui'
 import { Link } from 'react-router-dom'
 
@@ -21,8 +21,6 @@ export default function DexDemo() {
 
     try {
       // 1. Protocol creates a gate once (this one is OFAC-compliant DEX gate)
-      const GATE_ID = '6175686100302322014139625113411878641364541222007420711432603935318728527781field'
-
       // 2. Protocol checks proof registry in 1 line of code
       const proofKey = `aleo1t0wgyx37vyzm93p2v65k9u778h7qz0z7z0z7z0z7z0z7z0z7z0z7z0z7z0z7z0z7z0z7z0z7z0z7z0field`
       const result = await queryMapping('proof_registry', proofKey)
